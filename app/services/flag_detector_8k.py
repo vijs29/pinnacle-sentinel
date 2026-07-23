@@ -19,6 +19,7 @@ sections, and classifies flags:
 Rate-limited to stay well under SEC's request limits.
 """
 import re
+import subprocess
 import time
 import requests
 from bs4 import BeautifulSoup
@@ -29,6 +30,26 @@ from app.models.filing import Filing, FlagEvent
 SEC_HEADERS = {"User-Agent": "Vijay Sentinel vijay.cloudarchitect@gmail.com"}
 REQUEST_DELAY_SECONDS = 0.2
 
+NOTIFY_EVERY_N = 1000  # macOS notification popup interval (progress checkpoints)
+
+def _notify(title: str, message: str):
+    """Native macOS notification popup so progress is visible without
+    checking the log file. Uses terminal-notifier (brew install
+    terminal-notifier) rather than bare osascript -- found 2026-07-22 that
+    Terminal.app doesn't reliably self-register with macOS Notification
+    Center for osascript-triggered notifications, but terminal-notifier
+    does register properly and its persistence (banner vs. sticky alert)
+    is configurable via System Settings -> Notifications -> terminal-notifier.
+    Best-effort -- never lets a notification failure crash the actual job
+    (e.g. if run on a machine without terminal-notifier installed)."""
+    try:
+        subprocess.run(
+            ["terminal-notifier", "-title", title, "-message", message, "-sound", "default"],
+            timeout=5, capture_output=True,
+        )
+    except Exception:
+        pass  # never let notification failures affect the actual job
+
 ITEM_HEADING_RE = re.compile(r"Item\s+(\d+\.\d+)\.?\s*([^\n]{0,120})", re.IGNORECASE)
 ITEM_502_HEADING_RE = re.compile(r"^Item\s+5\.02\.?[^\n]*\n", re.IGNORECASE)
 
@@ -38,12 +59,29 @@ CFO_KEYWORDS = ["chief financial officer", "cfo"]
 RESIGNATION_KEYWORDS = ["resign", "resignation", "departure", "retire", "stepping down"]
 
 
-def fetch_filing_text(url: str):
-    resp = requests.get(url, headers=SEC_HEADERS, timeout=15)
-    if resp.status_code != 200:
-        return None
-    soup = BeautifulSoup(resp.content, "lxml")
-    return soup.get_text(separator="\n")
+def fetch_filing_text(url: str, max_retries: int = 3):
+    """Fetch + parse a filing's text, with retry/backoff on transient
+    network errors. FIXED 2026-07-23: the original version had no retry
+    handling at all -- a single ReadTimeout from sec.gov crashed the whole
+    batch job, killing it at 14,750/57,016 filings with no automatic
+    recovery. Now retries up to 3x with exponential backoff before giving
+    up on this one filing (returns None, same as before -- caller already
+    treats None as a fetch failure and leaves processed=False for retry
+    on a future run)."""
+    for attempt in range(max_retries):
+        try:
+            resp = requests.get(url, headers=SEC_HEADERS, timeout=20)
+            if resp.status_code != 200:
+                return None
+            soup = BeautifulSoup(resp.content, "lxml")
+            return soup.get_text(separator="\n")
+        except requests.exceptions.RequestException as e:
+            if attempt < max_retries - 1:
+                wait = 2 ** attempt  # 1s, 2s, 4s
+                time.sleep(wait)
+                continue
+            print(f"  WARN: fetch failed after {max_retries} attempts for {url}: {e}")
+            return None
 
 
 def extract_items(text: str) -> dict:
@@ -107,42 +145,66 @@ def run(limit=None):
 
     flags_created = 0
     fetch_failures = 0
+    other_failures = 0
 
     for i, filing in enumerate(filings):
-        text = fetch_filing_text(filing.filing_url)
-        time.sleep(REQUEST_DELAY_SECONDS)
+        try:
+            text = fetch_filing_text(filing.filing_url)
+            time.sleep(REQUEST_DELAY_SECONDS)
 
-        if text is None:
-            fetch_failures += 1
+            if text is None:
+                fetch_failures += 1
+                continue
+
+            items = extract_items(text)
+            detected = classify_8k(items)
+
+            for d in detected:
+                db.add(FlagEvent(
+                    filing_id=filing.id,
+                    cik=filing.cik,
+                    ticker=filing.ticker,
+                    flag_type=d["flag_type"],
+                    flag_tier=1,
+                    filing_date=filing.filing_date,
+                    details={"item_code": d["item_code"], "snippet": d["snippet"]},
+                ))
+                flags_created += 1
+
+            filing.processed = True
+        except Exception as e:
+            # FIXED 2026-07-23: this loop had no per-filing exception handling
+            # at all -- an unhandled ReadTimeout crashed the entire batch job
+            # at 14,750/57,016 filings with no recovery. One bad filing (bad
+            # HTML, transient DB issue, anything) must never kill the whole
+            # remaining batch. Leave filing.processed=False so it's retried
+            # on the next run; roll back only this filing's uncommitted state.
+            db.rollback()
+            other_failures += 1
+            print(f"  WARN: unexpected error on filing {filing.id} ({filing.ticker}, "
+                  f"{filing.filing_date}): {e}")
             continue
-
-        items = extract_items(text)
-        detected = classify_8k(items)
-
-        for d in detected:
-            db.add(FlagEvent(
-                filing_id=filing.id,
-                cik=filing.cik,
-                ticker=filing.ticker,
-                flag_type=d["flag_type"],
-                flag_tier=1,
-                filing_date=filing.filing_date,
-                details={"item_code": d["item_code"], "snippet": d["snippet"]},
-            ))
-            flags_created += 1
-
-        filing.processed = True
 
         if (i + 1) % 100 == 0:
             db.commit()
             print(f"  progress: {i + 1}/{len(filings)} filings checked, {flags_created} flags so far")
+
+        if (i + 1) % NOTIFY_EVERY_N == 0:
+            remaining = len(filings) - (i + 1)
+            _notify(
+                "Sentinel 8-K Flag Detector",
+                f"{i + 1}/{len(filings)} done, {remaining} remaining, {flags_created} flags so far"
+            )
 
     db.commit()
     db.close()
 
     print(f"Filings checked: {len(filings)}")
     print(f"Fetch failures (left unprocessed, retry later): {fetch_failures}")
+    print(f"Other failures (left unprocessed, retry later): {other_failures}")
     print(f"Flags created: {flags_created}")
+
+    _notify("Sentinel 8-K Flag Detector", f"DONE -- {flags_created} flags created, {fetch_failures + other_failures} failures")
 
 
 if __name__ == "__main__":
