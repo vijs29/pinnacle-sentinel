@@ -1,7 +1,17 @@
 # Pinnacle Sentinel — Handoff Document
 
-Last updated: 2026-07-21. Read this first if picking up a new session —
-JOURNAL.md doesn't exist yet for this project (see "Known gaps" below).
+Last updated: 2026-07-23 (evening). Read this first if picking up a new session.
+
+## Quick bridge: what happened to Pinnacle Quant recently
+
+If you're a fresh session picking up either project: Quant had a long,
+substantial session on 2026-07-21/22 (cluster-robust signal re-analysis,
+Alpaca account rotation, a single-source-of-truth signal classification
+refactor across 8 files). That project is fully documented in its own
+JOURNAL.md and METHODOLOGY.md (Pinnacle-quant-markers-for-stock-market
+repo) -- read those first if working on Quant. Quant is considered done
+coding-wise for now; it's waiting on forward paper-trading data to
+accumulate and grade. This document is Sentinel-only.
 
 ## What Sentinel is
 
@@ -13,127 +23,109 @@ Pinnacle Quant validates its trading signals.
 
 Full product rationale, architecture, and v1 scope decisions are in the
 conversation history (search past chats for "Pinnacle Sentinel" if picking
-this up fresh) — not yet written into a committed docs/ file. **This is the
-single biggest gap for a future session to close: there is no
-docs/decisions.md or docs/strategy.md for Sentinel, unlike every other
-Pinnacle project.**
+this up fresh) -- not yet written into a committed docs/ file. This is
+still the single biggest documentation gap: there is no docs/decisions.md,
+docs/strategy.md, or JOURNAL.md for Sentinel, unlike every other Pinnacle
+project. (The git-repo gap from the previous version of this doc IS now
+fixed -- see below.)
 
 ## Stack & locations
 
-- Repo: shared `PINNACLE` parent git repo on the Mac (NOT its own repo yet —
-  `git rev-parse --show-toplevel` returns the PINNACLE parent, and Sentinel
-  has zero of its own commits). This should probably be fixed (own repo, per
-  the original plan of `github.com/vijs29/pinnacle-sentinel`) before much
-  more work goes in — right now nothing is version-controlled.
-- Path: `/Users/vijnewmac/projects/PINNACLE/pinnacle-sentinel`
-- Backend: FastAPI, port 8010, `.venv` at project root
-- Frontend: React/Vite, port 5180 (set explicitly in `ui/vite.config.js`,
-  `strictPort: true`)
-- DB: Postgres `pinnacle_sentinel`, user `pinnacle`, localhost:5432
-- Tables: `filings`, `flag_events`, `sentinel_outcomes`, `watchlist_items`
-  (see `app/models/filing.py` for full schema)
+- Repo: now a real, standalone git repo -- github.com/vijs29/pinnacle-sentinel
+  (fixed 2026-07-22; previously had zero commits and lived inside the shared
+  PINNACLE parent repo with nothing version-controlled). .gitignore already
+  correctly excludes .venv/, node_modules/, .env, *.log, __pycache__/.
+- Path: /Users/vijnewmac/projects/PINNACLE/pinnacle-sentinel
+- Backend: FastAPI, port 8010, .venv at project root
+- Frontend: React/Vite, port 5180 (set explicitly in ui/vite.config.js,
+  strictPort: true)
+- DB: Postgres pinnacle_sentinel, user pinnacle, localhost:5432
+- Tables: filings, flag_events, sentinel_outcomes, watchlist_items
+  (see app/models/filing.py for full schema)
 
 ## What's built and working
 
-1. **Universe** — S&P 500 constituents + CIK numbers, sourced from Wikipedia
-   (`app/services/universe_builder.py`), stored at `app/config/universe.csv`
-   (503 rows). NOTE: originally planned to include Russell 1000 via iShares
-   IWB holdings CSV — abandoned after confirming Akamai Bot Manager blocks
-   scripted access (would require Playwright/headless browser; not worth it
-   for a weekly job). Universe is currently S&P 500 only. Not yet scheduled
-   to auto-refresh (was deferred until the ingestion scheduler exists —
-   still deferred).
+1. Universe -- S&P 500 constituents + CIK numbers, sourced from Wikipedia
+   (app/services/universe_builder.py), stored at app/config/universe.csv
+   (503 rows). Russell 1000 via iShares IWB was abandoned -- Akamai Bot
+   Manager blocks scripted access (would need Playwright; not worth it for
+   a weekly job). S&P 500 only for now. Not scheduled to auto-refresh yet.
 
-2. **EDGAR ingestion** — `app/services/edgar_ingest.py`. Polls SEC's
-   submissions API (`data.sec.gov/submissions/CIK##########.json`, NOT
-   full-text search — submissions API is the right fit for per-company
-   structured polling) for all 503 universe companies, filters to 4 target
-   form types (Form 4, 8-K, NT 10-K, NT 10-Q), writes new filings to the
-   `filings` table with `processed=False`. Already run once: **342,429
-   filings ingested** (full available history per company, not just recent —
-   the submissions API's "recent" block returns each company's whole
-   history, capped around ~1000 entries). Breakdown: Form 4 285,306 · 8-K
-   57,066 · NT 10-Q 32 · NT 10-K 25.
+2. EDGAR ingestion -- app/services/edgar_ingest.py. Polls SEC's submissions
+   API for all 503 universe companies, 4 target form types. Already run
+   once: 342,429 filings ingested (Form 4 285,306, 8-K 57,066, NT 10-Q 32,
+   NT 10-K 25).
 
-3. **Flag detection — late filing** — `app/services/flag_detector.py`.
-   Trivial existence check (NT 10-K/10-Q filing = flag). Run to completion:
-   **57 late_filing flags created**, all 57 NT filings processed.
+3. Flag detection -- late filing -- app/services/flag_detector.py. Complete:
+   57 late_filing flags, all 57 NT filings processed.
 
-4. **Flag detection — 8-K item codes** — `app/services/flag_detector_8k.py`.
-   Fetches each 8-K's actual document, extracts "Item X.XX" sections via
-   regex, classifies:
-   - Item 4.01 → always `auditor_change`
-   - Item 4.02 → `material_weakness` OR `auditor_change`, decided by keyword
-     match in the item text (4.02 covers both)
-   - Item 5.02 → `cfo_resignation`, ONLY if the item BODY (boilerplate
-     heading stripped first) mentions both a CFO role and a
-     resignation/departure keyword
+4. Flag detection -- 8-K item codes -- app/services/flag_detector_8k.py.
+   Classifies Item 4.01 -> auditor_change, Item 4.02 -> material_weakness OR
+   auditor_change (keyword-decided), Item 5.02 -> cfo_resignation (keyword-
+   decided on the body text with the boilerplate heading stripped first --
+   a real false-positive bug was found and fixed on 2026-07-21, see git log).
 
-   **Real bug found and fixed this session:** naive keyword matching against
-   the FULL Item 5.02 text (including its standard boilerplate heading,
-   which always contains "departure"/"appointment" regardless of content)
-   produced false positives — e.g. flagged 3M's CFO as resigning when the
-   filing was actually about RTX's CFO joining 3M's board. Fixed by
-   stripping the heading line before keyword matching. Verified against a
-   50-filing test batch before/after the fix (5 flags → 2 correct flags).
+   2026-07-22/23: this job crashed mid-run and was fixed + restarted. The
+   version launched at the end of the 2026-07-21 session hit an unhandled
+   ReadTimeout from sec.gov and died silently at 14,750/57,016 filings --
+   sat dead the rest of that session with zero recovery, since neither the
+   fetch function nor the per-filing processing loop had any exception
+   handling. Fixed:
+   - fetch_filing_text(): retries up to 3x with exponential backoff
+     (1s/2s/4s) on network errors, timeout 15s->20s.
+   - run() loop: per-filing try/except so one bad filing (bad HTML,
+     transient DB issue, etc.) can never crash the remaining batch --
+     rolls back just that filing, leaves processed=False for retry,
+     continues.
+   - Added terminal-notifier-based progress notifications (with sound)
+     every 1,000 filings + a completion notification, so liveness is
+     visible without checking the log. Note: plain osascript notifications
+     did NOT work reliably on this Mac (Terminal.app doesn't self-register
+     with Notification Center for them) -- had to install
+     brew install terminal-notifier instead, which registers properly.
+     If notifications aren't appearing, check System Settings ->
+     Notifications -> terminal-notifier -> Allow Notifications, and that no
+     Focus/DND mode is active.
 
-   **Status: RUNNING IN BACKGROUND as of session end** (PID varies per
-   run — check with `ps aux | grep flag_detector_8k`). Launched via:
-   `nohup python3 -m app.services.flag_detector_8k 60000 > analysis_8k_output.log 2>&1 &`
-   Progress as of last check: **14,050 / 57,066 8-K filings processed
-   (~24.6%)**. Results so far: 510 cfo_resignation, 9 auditor_change,
-   2 material_weakness. Check progress with:
-tail -5 analysis_8k_output.log
-psql -h 127.0.0.1 -p 5432 -U pinnacle -d pinnacle_sentinel -c
-"SELECT COUNT(*) FROM filings WHERE form_type='8-K' AND processed=true;"
-At current pace (~0.2s/request rate limit), expect several more hours to
-   complete all 57,066. If the process dies, just re-run the same command —
-   it only processes `processed=false` rows, so it's safe to resume.
+   Status: RUNNING IN BACKGROUND as of this doc's timestamp (PID varies per
+   run -- check with ps aux | grep flag_detector_8k). Relaunched via:
+   nohup python3 -m app.services.flag_detector_8k 60000 > analysis_8k_output.log 2>&1 &
+   Progress as of last check: 17,450 / 57,066 processed (~30.6%). Check with:
+
+   tail -10 analysis_8k_output.log
+   psql -h 127.0.0.1 -p 5432 -U pinnacle -d pinnacle_sentinel -c "SELECT COUNT(*) FROM filings WHERE form_type='8-K' AND processed=true;"
+   ps aux | grep flag_detector_8k | grep -v grep
+
+   If it's not running when you check (crashed again despite the fixes, or
+   the Mac was asleep/restarted), just re-run the same nohup command -- it
+   only processes processed=false rows, fully safe to resume, no duplicate
+   work.
 
 ## What's NOT built yet (in priority order per original v1 plan)
 
-1. **Accelerated insider selling detector** (Form 4 signals, 285,306 filings
-   already ingested and waiting). This is the hardest of the 5 flags —
-   needs per-insider historical baseline computation (e.g. trailing 90-day
-   selling activity), not a single-filing check like the others. Not started.
-
-2. **Confluence scorer** — turns flag_events into WATCH/ALERT classifications
-   per company (1 flag = WATCH, 2+ = ALERT). Not started; straightforward
-   once insider-selling detection exists (currently only late_filing and
-   3 of the 8-K flags would feed it, insider selling is likely the highest-
-   value flag for the target audience of short sellers).
-
-3. **Outcome validation loop** — the `sentinel_outcomes` table exists
-   (schema built) but nothing populates it yet. Needs: fetch price at
-   filing date (T=0) and at T+30/90/180/365, compute excess return vs SPY,
-   flag decline_10pct/decline_20pct/bankruptcy_or_delisted. This is the
-   Sentinel equivalent of Quant's outcome_checker — same statistical
-   rigor should apply (and given today's Quant session, use cluster-robust
-   testing / net-of-cost thinking from the start rather than retrofitting).
-
-4. **Pushover notification wiring** — `.env` has empty
-   `PUSHOVER_USER_KEY`/`PUSHOVER_APP_TOKEN` placeholders. Reuse Quant's
-   dedup pattern once flags are actually alert-worthy (post confluence
-   scorer).
-
-5. **Frontend** — `Landing.jsx` and `Screener.jsx` do not exist yet (only
-   empty `src/pages/` directory + `App.jsx` importing them, which currently
-   causes a Vite error if the frontend dev server is accessed). Deliberately
-   deferred multiple times this session in favor of backend/data work.
-   `/api/filings` endpoint in `app/api/main.py` also still references the
-   OLD single-table schema (`Filing.confluence_score`, `Filing.flag_type`,
-   etc.) that predates the current normalized `Filing`/`FlagEvent`/
-   `SentinelOutcome` schema — will 500 if called. Needs a full rewrite once
-   there's a reason to build the UI against it.
+1. Accelerated insider selling detector (Form 4, 285,306 filings already
+   ingested). Hardest of the 5 flags -- needs per-insider historical
+   baseline (e.g. trailing 90-day selling activity), not a single-filing
+   check. Not started. This is the natural next step once the 8-K job
+   finishes.
+2. Confluence scorer -- flag_events -> WATCH/ALERT per company. Not
+   started; straightforward once insider-selling exists.
+3. Outcome validation loop -- sentinel_outcomes table exists, nothing
+   populates it. Given Quant's 2026-07-21/22 session, use cluster-robust
+   testing from the start here, not as a retrofit.
+4. Pushover notification wiring -- .env has empty PUSHOVER_USER_KEY /
+   PUSHOVER_APP_TOKEN placeholders.
+5. Frontend -- Landing.jsx/Screener.jsx don't exist yet (empty src/pages/,
+   App.jsx errors if the dev server is accessed). /api/filings in
+   app/api/main.py still references the OLD flat pre-redesign schema --
+   will 500 if called, needs a rewrite.
 
 ## Known gaps / cleanup items for a future session
 
-- No git repo, no commit history, no docs/decisions.md, docs/strategy.md,
-  or JOURNAL.md — unlike every other Pinnacle project. Should be fixed
-  before this grows much further; right now a lost Mac = lost Sentinel
-  entirely (unlike Quant, which has a full git history and cloud remote).
-- `/api/filings` endpoint is broken against the current schema (see above).
-- No scheduled/cron jobs exist yet for anything (ingestion, flag detection,
-  universe refresh) — everything so far has been manual one-off script runs.
-- iShares/Akamai bot-blocking finding should probably be written somewhere
-  more permanent than this handoff doc if Russell 1000 coverage is revisited.
+- No git repo -- FIXED 2026-07-22, now on GitHub.
+- /api/filings endpoint still broken against the current schema.
+- No scheduled/cron jobs exist yet for anything.
+- No docs/decisions.md, docs/strategy.md, or JOURNAL.md -- still the
+  biggest remaining gap, worth doing before this grows much further.
+- iShares/Akamai bot-blocking finding should get written somewhere more
+  permanent than this doc if Russell 1000 coverage is ever revisited.
