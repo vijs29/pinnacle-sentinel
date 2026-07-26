@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 48" fill="none" role="img" aria-label="Pinnacle">
+  <defs>
+    <linearGradient id="sg" x1="20" y1="3" x2="20" y2="47" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#dbc468"/>
+      <stop offset="50%"  stop-color="#c9a84c"/>
+      <stop offset="100%" stop-color="#a07a24"/>
+    </linearGradient>
+    <linearGradient id="hl" x1="4" y1="25" x2="36" y2="25" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="rgba(255,255,255,0.20)"/>
+      <stop offset="55%"  stop-color="rgba(255,255,255,0.05)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+    </linearGradient>
+  </defs>
+  <path d="M20,3 L36,9 L36,27 C36,39 28,45 20,47 C12,45 4,39 4,27 L4,9 Z"
+        fill="url(#sg)"/>
+  <path d="M20,3 L36,9 L36,27 C36,39 28,45 20,47 C12,45 4,39 4,27 L4,9 Z"
+        fill="url(#hl)"/>
+  <path d="M20,3 L36,9 L36,27 C36,39 28,45 20,47 C12,45 4,39 4,27 L4,9 Z"
+        stroke="rgba(255,255,255,0.18)" stroke-width="0.6"/>
+  <path fill="#06091a" fill-rule="evenodd"
+        d="M 12,14 L 12,34 L 16,34 L 16,27 C 29,27 29,14 16,14 Z
+           M 16,17.5 C 24.5,17.5 24.5,24 16,24 Z"/>
+</svg>

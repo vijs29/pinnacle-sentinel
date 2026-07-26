@@ -55,16 +55,11 @@ export default function NavBar({ subtitle, hideBackHome = false }) {
               }}>⌂ Home</button>
             </>
           )}
-          <div style={{
-            width: 28, height: 28, borderRadius: 6,
-            background: 'linear-gradient(135deg, #d4443f, #b3413e)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 14, fontWeight: 800, color: '#fff', flexShrink: 0,
-          }}>
-            S
-          </div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: '#d4443f', letterSpacing: 1, whiteSpace: 'nowrap' }}>
-            PINNACLE SENTINEL
+          <img src="/pinnacle-logo.svg" alt="Pinnacle Sentinel" style={{ height: 28 }} />
+          <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: 1, whiteSpace: 'nowrap' }}>
+            <span style={{ color: 'var(--gold-400, #c9a84c)' }}>PINNACLE</span>
+            {' '}
+            <span style={{ color: '#d4443f' }}>SENTINEL</span>
           </div>
         </div>
 

@@ -488,3 +488,40 @@ flag_type filter working, tape showing genuine mix of severity colors.
 
 Frontend is now functional for the first time since project scaffolding
 (2026-07-20).
+
+
+## 2026-07-27 (cont'd) -- NavBar branding: real Pinnacle shield icon, gold+red split wordmark
+
+Replaced the placeholder 'S' square icon with the real Pinnacle brand
+mark. Two real bugs along the way, both found via browser devtools
+(fetch + DOMParser), not assumed:
+
+1. Copying Quant's pinnacle-logo.svg wholesale carried "QUANT" baked in
+   as an SVG <text> element (aria-label="Pinnacle Quant") -- the file is
+   the ENTIRE Quant lockup (shield + wordmark), not just an icon. Fixed
+   by cropping the viewBox to the shield+P only (0 0 40 48, was
+   0 0 175 48) and removing both <text> elements, since Sentinel renders
+   its own "PINNACLE SENTINEL" wordmark separately in JSX.
+
+2. First attempted fix to that crop introduced a genuine XML bug: an
+   inline comment containing a literal double-hyphen ("mark only --
+   Sentinel...") -- illegal inside XML comments per spec, confirmed via
+   DOMParser's parsererror ("Comment must not contain '--'"). This broke
+   the ENTIRE SVG parse (img.naturalWidth/Height both 0), not a partial
+   render -- looked like "no shield, something horrible" rather than a
+   subtle visual bug. Fixed by removing the comment/double-hyphen
+   entirely, rewriting the file clean.
+
+Verified end-to-end via javascript_tool: fetch + DOMParser confirmed
+zero parser errors, img.naturalWidth/Height non-zero, correct 40:48
+aspect ratio rendering. Confirmed visually by Vijay in browser.
+
+NavBar.jsx wordmark: colors confirmed against Quant's live navbar
+(quant.pinnacletranscore.com) via javascript_tool -- Quant's own
+wordmark is a single solid gold (#c9a84c, confirmed via getComputedStyle),
+NOT split-color. Sentinel's gold PINNACLE + red SENTINEL split is a
+deliberate Sentinel-specific customization per explicit instruction, not
+a mismatch against Quant's own convention.
+
+Final asset: ui/public/pinnacle-logo.svg (shield+P icon only, 1189
+bytes), used via <img src="/pinnacle-logo.svg"> in NavBar.jsx.
