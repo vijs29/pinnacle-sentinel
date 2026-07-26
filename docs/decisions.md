@@ -162,3 +162,80 @@ describing what happened. Verified via a before/after test batch (5 flags
   model) -- should probably borrow Quant's cluster-robust, net-of-cost
   testing discipline established 2026-07-21/22, rather than reinvent it
   less rigorously.
+
+## D-009 -- Scope expansion: comprehensive Category 1 + Category 2 coverage (2026-07-26)
+
+SUPERSEDES D-002's five-flag boundary. Original v1 scope (late filing,
+auditor change, CFO resignation, material weakness, accelerated insider
+selling) was an arbitrarily-bounded starting subset, not a considered
+final scope. Corrected scope is comprehensive coverage across both
+categories used in real forensic/short-seller research:
+
+Category 1 (disclosure/text-based, expanded): the original five, plus
+going-concern language (previously deferred to v2 per D-002 -- now in
+scope), financial restatements, related-party transaction changes,
+revenue recognition policy changes, accounting method changes, debt
+covenant violation language, SEC investigation/subpoena/whistleblower
+mentions, executive compensation red flags (DEF 14A).
+
+Category 2 (financial ratio/XBRL-based, new): Beneish M-Score (8
+variables), Altman Z-Score (5 variables), Sloan accruals ratio, plus
+individual ratios (OCF/NI divergence, DSO trend, inventory turnover,
+capex/depreciation, receivables growth vs revenue growth, debt trends).
+
+Existing built work (8-K/NT detectors, current schema) is superseded
+where it conflicts with the rework below -- scrapping/reworking is
+accepted as the cost of getting scope right, per explicit instruction
+2026-07-26.
+
+## D-010 -- New data domains and sources (2026-07-26)
+
+- XBRL structured financials: data.sec.gov/api/xbrl/companyfacts/
+  CIK##########.json, per-company, no API key -- same polling pattern
+  as existing submissions-API ingestion (D-005).
+- DEF 14A (proxy statements): via existing submissions-API ingestion,
+  new form type added to the target list.
+- Full 10-K/10-Q text: extracted sections only (audit opinion,
+  related-party footnote, revenue-recognition note, debt covenant
+  language), NOT full documents -- storage volume consideration, see
+  D-011.
+- Market cap history (price x shares outstanding): reuse Pinnacle
+  Quant's yfinance pipeline rather than build a second price feed --
+  needed only for Altman Z-Score's X4 variable.
+- SEC full-text search (efts.sec.gov): reintroduced, previously deferred
+  in D-005 for a different reason (per-company polling was the v1 need);
+  now the right tool for cross-company keyword scans (going-concern,
+  restatement, investigation language).
+
+## D-011 -- Schema rework: FinancialFact, QuantScore, FlagEvent.source_type (2026-07-26)
+
+Original Filing/FlagEvent/SentinelOutcome schema (D-007) assumed every
+flag traces to a single discrete filing event -- breaks for Category 2,
+where scores/ratios are computed across multiple periods of financial
+data, not one filing.
+
+New tables:
+- FinancialFact: (cik, concept, unit, period_end, fiscal_year,
+  fiscal_period, value, form_type) -- local mirror of SEC XBRL
+  companyfacts structure.
+- QuantScore: (cik, period_end, score_type, value, component_json) --
+  stores composite scores WITH underlying component variables, not just
+  the final number, so scores are auditable the same way the
+  cfo_resignation investigation (2026-07-25) audited a text classifier.
+
+FlagEvent gets a new source_type column (disclosure | quantitative) so
+confluence scoring can sum across both flag categories consistently.
+
+Full 10-K/10-Q text: store extracted relevant sections only, not full
+documents -- full-document storage across 503 companies x multiple
+years would bloat local Postgres significantly; EDGAR URL retained as
+source-of-truth pointer.
+
+## D-012 -- flag_detector_8k.py sentence-boundary fix, revisited in this rework (2026-07-26)
+
+The naive ". "-based sentence-splitting bug found and reverted 2026-07-25
+(AOS false-negative from "A. O. Smith" abbreviation) is addressed now as
+part of this broader rework rather than deferred further -- switch to a
+real sentence tokenizer or fixed-character keyword window. Also revisits
+the still-unverified precision of auditor_change and material_weakness
+flagged in the 2026-07-25 journal entry.
