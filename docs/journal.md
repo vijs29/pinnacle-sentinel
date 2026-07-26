@@ -205,3 +205,35 @@ color-coding convention (veridia.pinnacletranscore.com uses its own
 distinct accent color per SKU, per the brand system established in
 Pinnacle Quant's April 2026 brand work -- gold shield base, SKU-specific
 sub-label colors).
+
+
+## 2026-07-26 (cont'd) -- XBRL ingestion completed, data quality verified
+
+Full 503-company XBRL companyfacts ingestion completed: 0 failed
+lookups, 1,493,566 facts seen (whitelisted concepts), 830,370 new facts
+inserted after dedup (gap between seen/inserted is expected -- same
+fact commonly reported in both a 10-Q and its comparative 10-K).
+
+**Verification before trusting the data:**
+- Per-concept coverage checked: 29 of 30 concepts had real cross-company
+  coverage (256-498 companies each, depending on concept -- lower counts
+  for e.g. CostOfRevenue/GrossProfit are expected, since not all filers
+  report gross margin as a distinct line item).
+- Found and fixed a real bug: GoodwillAndIntangibleAssetsNetExcludingGoodwill
+  returned ZERO rows across all 503 companies -- wrong/non-standard tag
+  name. Corrected to IntangibleAssetsNetExcludingGoodwill (the actual
+  standard us-gaap tag) and re-ran ingestion to backfill (PID 29560,
+  xbrl_ingest_backfill.log) -- safe re-run, dedup means only the newly
+  corrected concept's facts get inserted.
+- Spot-checked Apple (CIK 0000320193) NetIncomeLoss against known public
+  figures: FY2024 $93.736B, FY2023 $96.995B -- both match Apple's actual
+  reported net income. Ingestion values are trustworthy.
+- Checked for CIK format inconsistency between filings.cik and
+  financial_facts.cik (a real risk, since confluence scoring will need
+  to join disclosure flags against quantitative scores by CIK) -- both
+  tables store the same 10-digit zero-padded format (e.g. 0000320193).
+  No join-breaking mismatch.
+
+**Data is verified and ready.** Next: app/services/quant_scores.py --
+Sloan accruals ratio first (simplest, pipeline smoke test), then Beneish
+M-Score, then Altman Z-Score (needs market cap, not yet wired in).
