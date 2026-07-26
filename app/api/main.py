@@ -26,31 +26,53 @@ def health():
 @app.get("/api/filings")
 def get_filings(
     flag_type: str = None,
-    min_score: int = 1,
     limit: int = 50,
 ):
-    """Return recent filings with red flags."""
+    """Return recent detected flags (FlagEvent joined with Filing), not raw
+    unflagged filings. FIXED 2026-07-25: this endpoint previously referenced
+    the OLD flat pre-redesign schema (Filing.confluence_score, Filing.flag_type,
+    etc.) which no longer exist -- would 500 on every call. Now queries the
+    real normalized schema (Filing + FlagEvent, see decisions.md D-007)."""
     from app.db.session import SessionLocal
-    from app.models.filing import Filing
+    from app.models.filing import Filing, FlagEvent
     db = SessionLocal()
     try:
-        q = db.query(Filing).filter(Filing.confluence_score >= min_score)
+        q = (
+            db.query(FlagEvent, Filing)
+            .join(Filing, FlagEvent.filing_id == Filing.id)
+        )
         if flag_type:
-            q = q.filter(Filing.flag_type == flag_type)
-        filings = q.order_by(Filing.filing_date.desc()).limit(limit).all()
+            q = q.filter(FlagEvent.flag_type == flag_type)
+        rows = q.order_by(FlagEvent.filing_date.desc()).limit(limit).all()
         return [{
-            "id":               f.id,
-            "ticker":           f.ticker,
-            "company_name":     f.company_name,
-            "form_type":        f.form_type,
-            "filing_date":      f.filing_date.isoformat() if f.filing_date else None,
-            "flag_type":        f.flag_type,
-            "flag_detail":      f.flag_detail,
-            "confluence_score": f.confluence_score,
-            "price_at_filing":  f.price_at_filing,
-            "outcome_30d":      f.outcome_30d,
-            "outcome_90d":      f.outcome_90d,
-            "edgar_url":        f.edgar_url,
-        } for f in filings]
+            "id":           flag.id,
+            "ticker":       flag.ticker,
+            "company_name": filing.company_name,
+            "form_type":    filing.form_type,
+            "filing_date":  flag.filing_date.isoformat() if flag.filing_date else None,
+            "flag_type":    flag.flag_type,
+            "flag_tier":    flag.flag_tier,
+            "details":      flag.details,
+            "filing_url":   filing.filing_url,
+        } for flag, filing in rows]
+    finally:
+        db.close()
+
+
+@app.get("/api/flags/summary")
+def get_flags_summary():
+    """Counts per flag_type, for the Landing page and Screener filters."""
+    from app.db.session import SessionLocal
+    from app.models.filing import FlagEvent
+    from sqlalchemy import func
+    db = SessionLocal()
+    try:
+        rows = (
+            db.query(FlagEvent.flag_type, func.count(FlagEvent.id))
+            .group_by(FlagEvent.flag_type)
+            .all()
+        )
+        return {"counts": {flag_type: count for flag_type, count in rows},
+                "total": sum(count for _, count in rows)}
     finally:
         db.close()
