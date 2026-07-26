@@ -126,5 +126,150 @@ def compute_sloan_ratios():
     print(f"Companies with all 3 required facts for at least one year: {len(set(k[0] for k in common_keys))}")
 
 
+# ---------------------------------------------------------------------------
+# Beneish M-Score
+# ---------------------------------------------------------------------------
+
+from datetime import timedelta
+
+
+def _prior_year_lookup(facts_dict, cik, end_date):
+    """Given a {(cik, end_date): (ticker, value)} dict, find this company's
+    fact from ~1 year before end_date (350-380 days prior, same tolerance
+    used for duration-span filtering elsewhere in this file). Returns
+    (ticker, value) or None if no matching prior-year fact exists."""
+    target_start = end_date - timedelta(days=380)
+    target_end = end_date - timedelta(days=350)
+    for (fcik, fend), (ticker, value) in facts_dict.items():
+        if fcik == cik and target_start <= fend <= target_end:
+            return (ticker, value)
+    return None
+
+
+def compute_beneish_m_scores():
+    """Beneish M-Score (8 variables, all year-over-year). See journal.md
+    2026-07-26 -- reuses the end_date-join fix from the Sloan ratio build;
+    do NOT join on SEC's fy/fp fields, they describe the filing's fiscal
+    year, not each fact's actual period."""
+    db = SessionLocal()
+
+    revenues = _facts_by_company_period(db, "Revenues", is_duration=True)
+    receivables = _facts_by_company_period(db, "AccountsReceivableNetCurrent", is_duration=False)
+    cogs = _facts_by_company_period(db, "CostOfGoodsAndServicesSold", is_duration=True)
+    current_assets = _facts_by_company_period(db, "AssetsCurrent", is_duration=False)
+    ppe = _facts_by_company_period(db, "PropertyPlantAndEquipmentNet", is_duration=False)
+    total_assets = _facts_by_company_period(db, "Assets", is_duration=False)
+    depreciation = _facts_by_company_period(db, "DepreciationDepletionAndAmortization", is_duration=True)
+    sga = _facts_by_company_period(db, "SellingGeneralAndAdministrativeExpense", is_duration=True)
+    liabilities = _facts_by_company_period(db, "Liabilities", is_duration=False)
+    net_income = _facts_by_company_period(db, "NetIncomeLoss", is_duration=True)
+    ocf = _facts_by_company_period(db, "NetCashProvidedByUsedInOperatingActivities", is_duration=True)
+
+    # Every variable needs the same current-year end_date across all
+    # concepts -- use Revenues' keys as the anchor set, since every
+    # company reports Revenues.
+    computed = 0
+    skipped_missing_data = 0
+    skipped_div_zero = 0
+
+    for key in list(revenues.keys()):
+        cik, end_date = key
+        ticker, sales_t = revenues[key]
+
+        prior_sales = _prior_year_lookup(revenues, cik, end_date)
+        if prior_sales is None:
+            skipped_missing_data += 1
+            continue
+        _, sales_t1 = prior_sales
+
+        try:
+            rec_t = receivables[key][1]
+            rec_t1 = _prior_year_lookup(receivables, cik, end_date)[1]
+            cogs_t = cogs[key][1]
+            cogs_t1 = _prior_year_lookup(cogs, cik, end_date)[1]
+            ca_t = current_assets[key][1]
+            ca_t1 = _prior_year_lookup(current_assets, cik, end_date)[1]
+            ppe_t = ppe[key][1]
+            ppe_t1 = _prior_year_lookup(ppe, cik, end_date)[1]
+            assets_t = total_assets[key][1]
+            assets_t1 = _prior_year_lookup(total_assets, cik, end_date)[1]
+            dep_t = depreciation[key][1]
+            dep_t1 = _prior_year_lookup(depreciation, cik, end_date)[1]
+            sga_t = sga[key][1]
+            sga_t1 = _prior_year_lookup(sga, cik, end_date)[1]
+            liab_t = liabilities[key][1]
+            liab_t1 = _prior_year_lookup(liabilities, cik, end_date)[1]
+            ni_t = net_income[key][1]
+            ocf_t = ocf[key][1]
+        except (KeyError, TypeError):
+            skipped_missing_data += 1  # missing current or prior-year fact for some concept
+            continue
+
+        try:
+            dsri = (rec_t / sales_t) / (rec_t1 / sales_t1)
+            gm_t = (sales_t - cogs_t) / sales_t
+            gm_t1 = (sales_t1 - cogs_t1) / sales_t1
+            gmi = gm_t1 / gm_t
+            aqi_t = 1 - (ca_t + ppe_t) / assets_t
+            aqi_t1 = 1 - (ca_t1 + ppe_t1) / assets_t1
+            aqi = aqi_t / aqi_t1
+            sgi = sales_t / sales_t1
+            deprate_t = dep_t / (dep_t + ppe_t)
+            deprate_t1 = dep_t1 / (dep_t1 + ppe_t1)
+            depi = deprate_t1 / deprate_t
+            sgai = (sga_t / sales_t) / (sga_t1 / sales_t1)
+            lvgi = (liab_t / assets_t) / (liab_t1 / assets_t1)
+            tata = (ni_t - ocf_t) / assets_t
+        except ZeroDivisionError:
+            skipped_div_zero += 1
+            continue
+
+        m_score = (
+            -4.84 + 0.92 * dsri + 0.528 * gmi + 0.404 * aqi + 0.892 * sgi
+            + 0.115 * depi - 0.172 * sgai + 4.679 * tata - 0.327 * lvgi
+        )
+
+        # AQI is a ratio-of-ratios that can blow up when a company's
+        # "other assets" (non-current, non-PPE) is near zero in either
+        # year -- common in asset-heavy industries like oil & gas E&P.
+        # Found via EQT 2024 spot-check (2026-07-26): AQI=12.56 from a
+        # real but numerically unstable balance-sheet composition, not
+        # manipulation -- inflated M-Score to +2.33 on its own. Flag
+        # rather than silently trust when any component variable is
+        # implausibly large, per the same discipline as the Sloan-ratio
+        # fix (verify outliers by hand before trusting them).
+        unstable_component = any(
+            abs(v) > 10 for v in [dsri, gmi, aqi, sgi, depi, sgai, lvgi]
+        )
+
+        fiscal_year = end_date.year
+        existing = (
+            db.query(QuantScore)
+            .filter(QuantScore.cik == cik, QuantScore.fiscal_year == fiscal_year, QuantScore.score_type == "beneish_m_score")
+            .first()
+        )
+        if existing:
+            continue
+
+        db.add(QuantScore(
+            cik=cik, ticker=ticker, fiscal_year=fiscal_year, score_type="beneish_m_score",
+            value=m_score,
+            components={
+                "DSRI": dsri, "GMI": gmi, "AQI": aqi, "SGI": sgi, "DEPI": depi,
+                "SGAI": sgai, "LVGI": lvgi, "TATA": tata,
+                "unstable_component": unstable_component,
+            },
+        ))
+        computed += 1
+
+    db.commit()
+    db.close()
+
+    print(f"Beneish M-Scores computed: {computed}")
+    print(f"Skipped (missing current/prior-year data for some concept): {skipped_missing_data}")
+    print(f"Skipped (division by zero in a ratio): {skipped_div_zero}")
+
+
 if __name__ == "__main__":
     compute_sloan_ratios()
+    compute_beneish_m_scores()

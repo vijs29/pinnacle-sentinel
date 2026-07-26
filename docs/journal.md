@@ -303,3 +303,47 @@ plausible given 2020 oil-price-crash impairments and its later Chapter
 **Lesson for Beneish/Altman builds next:** do not trust SEC's fy/fp
 fields for period-joining across concepts -- always join on end_date
 directly, and verify duration spans, the way this fix required.
+
+
+## 2026-07-26 (cont'd) -- Beneish M-Score built; AQI instability found, flagged not fixed
+
+app/services/quant_scores.py extended with compute_beneish_m_scores() --
+8 variables (DSRI, GMI, AQI, SGI, DEPI, SGAI, LVGI, TATA), all
+year-over-year, using _prior_year_lookup() (350-380 day window) on top
+of the end_date-joined _facts_by_company_period() from the Sloan build.
+178 scores computed across 37 companies; 4,304 skipped for missing
+current/prior-year data on at least one of the 11 underlying concepts
+(expected -- CostOfGoodsAndServicesSold only covers 262/503 companies,
+SellingGeneralAndAdministrativeExpense 291/503, and Beneish requires
+ALL 8 variables simultaneously, both years).
+
+**Spot-checked outliers before trusting the run (same discipline as
+Sloan):** EQT 2024 initially computed AQI=12.56, M-Score=+2.33 --
+implausible on its face. Verified by hand against raw financial_facts:
+NOT a data bug (facts were clean, single-period, correctly matched).
+Real cause: AQI is a ratio-of-ratios that becomes numerically unstable
+when a company's "other assets" (1 - (CurrentAssets+PPE)/Assets) is
+near zero in either year -- common in asset-heavy industries like oil &
+gas E&P. EQT's 2023 balance sheet had CA+PPE = 98.7% of total assets,
+leaving almost nothing in the AQI numerator; 2024's Equitrans
+acquisition changed that composition, and dividing by a near-zero prior
+value blew the ratio up to 12.56 on its own contributing +5.07 to the
+M-Score (coefficient 0.404) -- a company would show as severe fraud risk
+purely from balance-sheet composition, not from anything a forensic
+analyst would actually flag.
+
+**Decision: flag, don't discard or silently trust.** Added
+unstable_component boolean to Beneish's stored components -- true if
+any of the 7 ratio-of-ratios variables (excludes TATA, which isn't a
+ratio-of-ratios) exceeds abs(10). 1 of 178 scores flagged (EQT 2024).
+Downstream consumers (confluence scorer, UI) should treat
+unstable_component=true scores as needing manual review, not as a
+reliable standalone red flag.
+
+Score range otherwise sane: -4.21 (HAS 2023) to -3.70 (BMY 2024) at the
+clean end, all well under the -1.78 flag threshold -- consistent with
+clean-accounting companies in the S&P 500 universe.
+
+Next: Altman Z-Score -- needs market cap (price x shares outstanding),
+not yet wired in per D-010. Will reuse Pinnacle Quant's yfinance
+pipeline rather than build a second price feed.
