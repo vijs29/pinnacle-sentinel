@@ -237,3 +237,36 @@ fact commonly reported in both a 10-Q and its comparative 10-K).
 **Data is verified and ready.** Next: app/services/quant_scores.py --
 Sloan accruals ratio first (simplest, pipeline smoke test), then Beneish
 M-Score, then Altman Z-Score (needs market cap, not yet wired in).
+
+
+## 2026-07-26 (cont'd) -- XBRL backfill bug found, fixed, and verified
+
+Backfill run for the corrected IntangibleAssetsNetExcludingGoodwill
+concept initially crashed: UniqueViolation on financial_facts, since
+existing_keys (loaded from DB as Python date objects) never matched
+freshly-parsed facts (start_date/end_date stayed as raw strings from
+SEC's JSON) -- the dedup check silently never matched anything, so the
+script tried to re-insert all ~830K already-committed facts and died on
+the first collision.
+
+Fixed: parse start_date/end_date with datetime.strptime() before
+building the fact dict, so types match what's pulled from the DB.
+Also wrapped both the periodic (every-50-company) and final commits in
+try/except, matching flag_detector_8k.py's per-batch resilience pattern
+-- a future bad chunk rolls back and logs, rather than killing the run.
+
+Re-ran after the fix: 503 companies polled, 2 failed (read timeouts
+after 3 retries each -- CIK 0000927653, 0001613103, transient network,
+not systematic), 21,361 new facts inserted (all IntangibleAssetsNet-
+ExcludingGoodwill, confirmed via COUNT query) -- correctly small this
+time, versus the crash-inducing near-830K re-insert attempt before the
+fix. Total financial_facts now 851,731. New concept has real coverage:
+379 of 503 companies (reasonable -- not every filer separately tags
+intangibles apart from goodwill).
+
+xbrl_ingest.py, financial_fact.py, xbrl_concepts.py were also found
+sitting uncommitted this session (written via heredoc, never git-added)
+-- committed retroactively (f9bbc60) before this backfill re-run.
+
+**XBRL data now fully verified and stable.** Next: app/services/
+quant_scores.py, starting with the Sloan accruals ratio.
