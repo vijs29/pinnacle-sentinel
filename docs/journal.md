@@ -444,3 +444,47 @@ later.
 Next: confluence scoring (sum flags per company across both source
 types, 1=WATCH/2+=ALERT per D-002/D-009) -- natural next step now that
 both disclosure and quantitative flags exist side by side.
+
+
+## 2026-07-27 (cont'd) -- Frontend built: Landing.jsx, Screener.jsx; two real bugs found and fixed
+
+Built Landing.jsx (hero, live flag-tape signature element, stats strip
+from /api/flags/summary, flag-category breakdown) and Screener.jsx
+(filterable table wired to /api/filings) -- these had never existed
+since scaffolding (see 2026-07-26 handoff-audit entry); App.jsx had
+been importing nonexistent files the whole time.
+
+**Bug found and fixed: /api/filings used an INNER JOIN on Filing**,
+which silently excluded every quantitative flag (source_type=
+'quantitative', filing_id=NULL -- Beneish/Altman/Sloan flags added
+2026-07-27) from ever appearing in the API response. Changed to LEFT
+JOIN, with company_name resolved from any Filing row sharing the same
+CIK when the flag has no Filing of its own (quantitative flags don't
+carry company_name directly).
+
+**Bug found and fixed: index.css was never imported.** main.jsx
+rendered <App /> but had no `import './index.css'` -- meaning the
+entire dark navy/gold/signal-red theme (and every CSS variable every
+component references) had never actually been loading, since NavBar.jsx
+was first built. Page was rendering on browser-default white. Fixed
+with one import line in main.jsx. This was a pre-existing bug, not
+something introduced today -- it just took an actual visual render
+(first time any page loaded a real UI end-to-end) to surface it.
+
+**Design note:** the flag tape (scrolling ticker-style strip of recent
+flags, colored dots for disclosure/watch/alert severity) is the
+signature element per the frontend-design skill's process -- literal to
+the SEC-surveillance subject rather than a generic hero stat block.
+Pulls a MIX of one representative disclosure flag_type and one
+quantitative flag_type (interleaved) rather than a single date-sorted
+query, since quantitative flags (fiscal-year-end dates) are naturally
+crowded out by disclosure flags (continuous daily EDGAR postings) in
+any simple date sort -- not a data bug, just a refresh-frequency
+mismatch between the two flag categories.
+
+Verified end-to-end in browser: dark theme renders correctly, live data
+flowing from both /api/flags/summary and /api/filings, Screener's
+flag_type filter working, tape showing genuine mix of severity colors.
+
+Frontend is now functional for the first time since project scaffolding
+(2026-07-20).

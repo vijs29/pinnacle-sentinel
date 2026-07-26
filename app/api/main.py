@@ -28,33 +28,59 @@ def get_filings(
     flag_type: str = None,
     limit: int = 50,
 ):
-    """Return recent detected flags (FlagEvent joined with Filing), not raw
-    unflagged filings. FIXED 2026-07-25: this endpoint previously referenced
-    the OLD flat pre-redesign schema (Filing.confluence_score, Filing.flag_type,
-    etc.) which no longer exist -- would 500 on every call. Now queries the
-    real normalized schema (Filing + FlagEvent, see decisions.md D-007)."""
+    """Return recent detected flags (FlagEvent, LEFT JOINed with Filing),
+    not raw unflagged filings. FIXED 2026-07-25: old flat-schema references
+    (would 500). FIXED 2026-07-27: was an INNER JOIN on Filing, which
+    silently excluded every quantitative flag (source_type='quantitative',
+    filing_id=NULL, e.g. Beneish/Altman/Sloan flags -- see decisions.md
+    D-011) from ever appearing here. Now LEFT JOIN, with company_name
+    resolved from any Filing row sharing the same CIK when the flag has
+    no Filing of its own."""
     from app.db.session import SessionLocal
     from app.models.filing import Filing, FlagEvent
     db = SessionLocal()
     try:
         q = (
             db.query(FlagEvent, Filing)
-            .join(Filing, FlagEvent.filing_id == Filing.id)
+            .outerjoin(Filing, FlagEvent.filing_id == Filing.id)
         )
         if flag_type:
             q = q.filter(FlagEvent.flag_type == flag_type)
         rows = q.order_by(FlagEvent.filing_date.desc()).limit(limit).all()
-        return [{
-            "id":           flag.id,
-            "ticker":       flag.ticker,
-            "company_name": filing.company_name,
-            "form_type":    filing.form_type,
-            "filing_date":  flag.filing_date.isoformat() if flag.filing_date else None,
-            "flag_type":    flag.flag_type,
-            "flag_tier":    flag.flag_tier,
-            "details":      flag.details,
-            "filing_url":   filing.filing_url,
-        } for flag, filing in rows]
+
+        name_cache = {}
+        def _company_name_for_cik(cik):
+            if cik in name_cache:
+                return name_cache[cik]
+            row = db.query(Filing.company_name).filter(Filing.cik == cik).first()
+            name = row[0] if row else None
+            name_cache[cik] = name
+            return name
+
+        results = []
+        for flag, filing in rows:
+            if filing is not None:
+                company_name = filing.company_name
+                form_type = filing.form_type
+                filing_url = filing.filing_url
+            else:
+                company_name = _company_name_for_cik(flag.cik)
+                form_type = (flag.details or {}).get("score_type")
+                filing_url = None
+
+            results.append({
+                "id":           flag.id,
+                "ticker":       flag.ticker,
+                "company_name": company_name,
+                "form_type":    form_type,
+                "filing_date":  flag.filing_date.isoformat() if flag.filing_date else None,
+                "flag_type":    flag.flag_type,
+                "flag_tier":    flag.flag_tier,
+                "source_type":  flag.source_type,
+                "details":      flag.details,
+                "filing_url":   filing_url,
+            })
+        return results
     finally:
         db.close()
 
