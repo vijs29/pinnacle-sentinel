@@ -270,3 +270,36 @@ sitting uncommitted this session (written via heredoc, never git-added)
 
 **XBRL data now fully verified and stable.** Next: app/services/
 quant_scores.py, starting with the Sloan accruals ratio.
+
+
+## 2026-07-26 (cont'd) -- Sloan ratio built, period-matching bug found and fixed
+
+app/services/quant_scores.py + app/models/quant_score.py (quant_scores
+table, components stored alongside final value per D-011) built. Sloan
+ratio = (NetIncomeLoss - OperatingCashFlow) / Assets, per company per
+fiscal year.
+
+**Bug found via spot-check, not assumed correct:** initial run joined
+NetIncomeLoss/OCF/Assets by SEC's fy label (fiscal_year field) --
+produced implausible outliers (VRT -11.1, CDNS -1.37, both far outside
+any real company's possible range). Root cause: SEC's fy/fp fields
+describe the FILING's fiscal year, not each fact's actual period -- a
+single 10-K reports current + prior-year comparatives, sometimes all
+tagged with the same fy label; VRT's 2018 fy bucket mixed a pre-merger
+shell-company Assets figure ($25,000, period end 2017-12-31) with a
+real post-merger NetIncomeLoss figure from a genuinely different period.
+
+Fixed: join by actual end_date instead of SEC's fy label; duration
+facts (NetIncomeLoss, OCF) filtered to 350-380 day spans to exclude
+quarterly figures SEC sometimes mislabels fiscal_period='FY' (also
+seen in CDNS's raw data); prefer 10-K over 10-Q when both report the
+same end_date. Cleared and recomputed: 6,747 ratios (up from the buggy
+run's 5,846 -- more companies matched cleanly once join logic was
+correct), 486 companies with coverage. Re-checked outlier range after
+fix: max +0.61 (GEN), min -1.66 (EXE, 2020) -- EXE's magnitude is
+plausible given 2020 oil-price-crash impairments and its later Chapter
+11 filing, not re-flagged as a bug.
+
+**Lesson for Beneish/Altman builds next:** do not trust SEC's fy/fp
+fields for period-joining across concepts -- always join on end_date
+directly, and verify duration spans, the way this fix required.
