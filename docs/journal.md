@@ -406,3 +406,41 @@ against the full universe -- rather than run-then-discover-then-patch.
 **Stopping here for today's quant-scores work.** Sloan (6,747 rows) and
 Beneish (317 rows) are solid. Altman (1,983 rows) is usable with the
 known, disclosed limitation above.
+
+
+## 2026-07-27 -- Quantitative scores converted to flags (FlagEvent.source_type)
+
+Schema: flag_events.filing_id made nullable, source_type column added
+('disclosure' | 'quantitative', default 'disclosure' for existing rows),
+quant_score_id FK to quant_scores added. Confirmed existing 2,085
+disclosure flags untouched after migration.
+
+app/services/quant_flags.py built -- converts quant_scores into
+flag_events with source_type='quantitative'. Thresholds:
+- Beneish M-Score > -1.78 (published cutoff); unstable_component=true
+  scores explicitly skipped (not flagged, not silently trusted).
+- Altman Z-Score < 1.81 (published cutoff); known understated for
+  split-history companies per D-013 -- treat non-flags with caution
+  for those companies, not flags.
+- Sloan ratio > +0.10 -- no published hard cutoff exists; judgment-call
+  starting point, may need revisiting via decile analysis once more
+  data exists.
+
+filing_date for quantitative flags resolved from the real Assets fact
+end_date for that cik/fiscal_year (handles non-calendar fiscal years
+like AAPL correctly), falling back to Dec 31 only if no match.
+
+Run results: 11 Beneish flags (1 skipped, unstable), 426 Altman flags,
+86 Sloan flags -- 523 total quantitative flags, alongside the existing
+2,085 disclosure flags (2,608 total in flag_events).
+
+Note: dedup only checks quant_score_id already flagged -- does NOT
+track "evaluated, didn't cross threshold." Safe to re-run after adding
+new scores; NOT safe to re-run after changing a threshold (would
+duplicate flags for scores already flagged under the old threshold).
+Acceptable for now, worth a stricter constraint if thresholds change
+later.
+
+Next: confluence scoring (sum flags per company across both source
+types, 1=WATCH/2+=ALERT per D-002/D-009) -- natural next step now that
+both disclosure and quantitative flags exist side by side.

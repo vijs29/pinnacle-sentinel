@@ -27,16 +27,21 @@ class FlagEvent(Base):
     __tablename__ = "flag_events"
 
     id = Column(Integer, primary_key=True)
-    filing_id = Column(Integer, ForeignKey("filings.id"), nullable=False)
+    filing_id = Column(Integer, ForeignKey("filings.id"), nullable=True)
+    quant_score_id = Column(Integer, ForeignKey("quant_scores.id"), nullable=True)
+    source_type = Column(String, nullable=False, default="disclosure")
+    # "disclosure" -- traces to a Filing (late_filing, auditor_change, etc.)
+    # "quantitative" -- traces to a QuantScore (sloan_ratio, beneish_m_score, altman_z_score)
     cik = Column(String, nullable=False, index=True)
     ticker = Column(String, nullable=True, index=True)
     flag_type = Column(String, nullable=False)
-    # "late_filing", "auditor_change", "cfo_resignation",
-    # "accelerated_insider_selling", "material_weakness"
+    # disclosure: "late_filing", "auditor_change", "cfo_resignation",
+    #             "accelerated_insider_selling", "material_weakness"
+    # quantitative: "sloan_ratio_high", "beneish_manipulation_risk", "altman_distress"
     flag_tier = Column(Integer, default=1)
-    filing_date = Column(Date, nullable=False)  # T=0, denormalized from Filing for convenience
+    filing_date = Column(Date, nullable=False)  # T=0; for quantitative flags, fiscal year-end date
     price_at_filing = Column(Float, nullable=True)  # filled in by outcome checker
-    details = Column(JSON, nullable=True)  # e.g. {"old_auditor": "X", "new_auditor": "Y"}
+    details = Column(JSON, nullable=True)  # e.g. {"old_auditor": "X", "new_auditor": "Y"} or score components
     detected_at = Column(DateTime, default=datetime.utcnow)
 
     filing = relationship("Filing", back_populates="flag_events")
