@@ -239,3 +239,31 @@ part of this broader rework rather than deferred further -- switch to a
 real sentence tokenizer or fixed-character keyword window. Also revisits
 the still-unverified precision of auditor_change and material_weakness
 flagged in the 2026-07-25 journal entry.
+
+
+## D-013 -- Known limitation: Altman Z-Score understated for split-history companies (2026-07-26)
+
+Altman Z-Score's market-value-of-equity term (price x shares outstanding)
+uses CommonStockSharesOutstanding as-reported per filing, not adjusted for
+stock splits that happen after that filing date. yfinance's price series
+is always split-adjusted regardless of settings, so pairing it with the
+as-reported share count understates market value of equity -- and
+therefore the Z-Score -- for any pre-split fiscal year, for any company
+that has split its stock since. Confirmed via TPL (two 3-for-1 splits,
+2024 and 2025).
+
+Attempted fix (scale share count by cumulative split ratio) worked for
+clean multi-way splits but broke on companies with spin-offs in their
+history -- yfinance records spin-off price adjustments in the same
+'Stock Splits' data field as genuine splits (e.g. MMM's 2024 Solventum
+spin-off appears as a 1.196 "split", not a real share-count change),
+and there's no reliable way to distinguish the two from yfinance's data
+alone without further work. Reverted rather than ship a partial fix.
+
+**Decision: leave as a known, disclosed limitation for now.** Sloan and
+Beneish M-Score are unaffected (no market-price dependency). Altman
+Z-Score remains usable, with the understanding that split-history
+companies' pre-split-year scores run low relative to their true value.
+Revisit only with a more rigorous approach (e.g. cross-referencing
+actual "stock split" 8-K filings, already ingested, to distinguish real
+splits from spin-off artifacts) if Altman precision becomes a priority.

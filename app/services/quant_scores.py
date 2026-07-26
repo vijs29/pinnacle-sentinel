@@ -98,29 +98,32 @@ def _prior_year_lookup(facts_dict, cik, end_date):
     return None
 
 
-def _get_unadjusted_history(ticker):
-    """Raw (NOT split/dividend-adjusted) daily close prices, for market-cap
-    calculations specifically. market_data.py's get_daily_history() uses
-    auto_adjust=True (correct for Quant's return-continuity needs), which
-    retroactively scales ALL historical prices down to reflect splits that
-    happen LATER -- wrong here, since CommonStockSharesOutstanding is the
-    actual unadjusted share count reported at each point in time (SEC
-    filings never retroactively restate for future splits). Pairing an
-    adjusted price with an unadjusted share count understates market value
-    of equity for every year before a split, by roughly the split ratio.
-    Found via TPL spot-check 2026-07-26 (shares_outstanding nearly tripled
-    2023->2024, matching TPL's real 3-for-1 split; back-of-envelope check
-    against real historical TPL prices confirmed the understatement)."""
+def _cumulative_split_factor_since(ticker, as_of_date):
+    """Product of all stock-split ratios that occurred strictly AFTER
+    as_of_date. yfinance's price series is ALWAYS split-adjusted to
+    today's share structure regardless of auto_adjust (that flag only
+    toggles dividend adjustment -- confirmed 2026-07-26 via TPL: raw vs
+    adjusted Close on the same date differed by only ~6%, not the ~9x a
+    true split-unadjustment would produce). CommonStockSharesOutstanding
+    from a historical filing is the real count AS OF that filing, never
+    restated for splits that happen later -- so it must be scaled UP to
+    match the price series' basis. Verified: TPL 2023 shares (7,669,227)
+    x cumulative factor since then (3x for the 2024 split, 3x for the
+    2025 split = 9x) = 69,023,043, within 0.12% of TPL's actual 2025
+    reported share count (68,938,230)."""
     import yfinance as yf
     try:
-        df = yf.Ticker(ticker).history(period="max", auto_adjust=False)
-        if df is None or df.empty:
-            return None
-        df = df[["Close"]].copy()
-        df.index = pd.to_datetime(df.index).tz_localize(None).normalize()
-        return df
+        splits = yf.Ticker(ticker).splits
+        if splits is None or splits.empty:
+            return 1.0
+        splits_dates = splits.index.tz_localize(None).normalize().date
+        factor = 1.0
+        for split_date, ratio in zip(splits_dates, splits.values):
+            if split_date > as_of_date:
+                factor *= ratio
+        return factor
     except Exception:
-        return None
+        return 1.0  # fail safe to no adjustment rather than crash the batch
 
 
 def _closest_close(price_history, target_date, max_gap_days=7):
@@ -362,7 +365,7 @@ def compute_altman_z_scores():
         ticker = total_assets[(cik, end_dates[0])][0]
 
         if ticker not in price_cache:
-            price_cache[ticker] = _get_unadjusted_history(ticker)
+            price_cache[ticker] = get_daily_history(ticker, period="max")
         price_history = price_cache[ticker]
 
         for end_date in end_dates:
