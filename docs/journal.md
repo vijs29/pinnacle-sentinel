@@ -347,3 +347,62 @@ clean-accounting companies in the S&P 500 universe.
 Next: Altman Z-Score -- needs market cap (price x shares outstanding),
 not yet wired in per D-010. Will reuse Pinnacle Quant's yfinance
 pipeline rather than build a second price feed.
+
+
+## 2026-07-26 (cont'd) -- Beneish revenue-tag fix, Altman split-price issue (UNRESOLVED)
+
+Merged 'Revenues' and 'RevenueFromContractWithCustomerExcludingAssessedTax'
+into one lookup (_merged_revenue_facts) after confirming via AAPL spot-
+check that these are the same underlying figure under two different SEC
+tags (ASC 606 transition, ~2018-2019) -- querying only 'Revenues' had
+been silently truncating both Beneish and Altman history at the
+transition point for every company that switched tags. Fix verified:
+AAPL's Altman history now runs 2016-2025 (was cut off at 2018); Beneish
+317 scores (was 178), Altman 1,983 scores (was 1,189).
+
+**Open, NOT resolved: Altman market-cap understatement for split stocks.**
+Found via TPL spot-check: shares_outstanding nearly tripled 2023->2024 in
+our data. Confirmed via web search this is real (TPL executed 3-for-1
+splits in March 2024 AND December 2025). Hypothesis: market_data.py's
+auto_adjust=True historical prices are retroactively split-adjusted,
+while CommonStockSharesOutstanding is the actual unadjusted share count
+at each filing date -- pairing them should understate market value of
+equity for pre-split years by roughly the split ratio.
+
+Attempted fix: added _get_unadjusted_history() using yfinance directly
+with auto_adjust=False. First attempt crashed (tz-aware vs tz-naive
+datetime subtraction -- fixed by adding the same tz_localize(None)
+normalization market_data.py already does). Second attempt RAN but did
+NOT behave as expected: raw price for TPL 2020-12-31 came back $80.78,
+nearly identical to the original auto_adjust=True value ($75.75) --
+not the ~3x (or ~9x, given two splits since 2020) higher figure the
+split-adjustment hypothesis predicted. Root cause NOT understood --
+possible yfinance version behavior difference (auto_adjust=False may
+not fully disable split-adjustment in this yfinance version), or a
+misunderstanding of yfinance's actual adjustment semantics. NOT
+guessed again live -- stopping here rather than layering a third
+unverified fix on top of two that didn't fully resolve it.
+
+**Current Altman Z-Score state, stated plainly:** usable, but pre-split-
+year values for any company that has split its stock are of UNKNOWN
+reliability -- may be understated, cause not confirmed. Companies that
+have never split are unaffected. This needs proper investigation (check
+yfinance's raw 'Stock Splits' column directly, verify against a known
+reference price from a source other than yfinance) before Altman scores
+for split-history companies should be trusted downstream. NOT blocking
+Sloan/Beneish, which don't depend on price data.
+
+**Process note, taken seriously:** this session found 5 real bugs in a
+row (VRT/CDNS period-join, AQI instability, revenue-tag truncation, tz
+mismatch, and this unresolved split issue) via a repeated write-then-
+spot-check-then-fix cycle. Flagged directly by the user: this pattern
+risks looking like manufacturing problems for the sake of appearing
+diligent, even when each bug was independently verified as real. Going
+forward: enumerate known data pitfalls for a domain (tag transitions,
+corporate actions, sparse coverage) BEFORE writing ingestion/scoring
+code, and validate new logic against 1-2 reference cases before running
+against the full universe -- rather than run-then-discover-then-patch.
+
+**Stopping here for today's quant-scores work.** Sloan (6,747 rows) and
+Beneish (317 rows) are solid. Altman (1,983 rows) is usable with the
+known, disclosed limitation above.
