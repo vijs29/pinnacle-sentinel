@@ -139,3 +139,58 @@ deleted from the Quant repo before it could be committed there.)
 - Documentation: decisions.md, strategy.md, this journal.md all created
   2026-07-24 to close the "no docs/ files, unlike every other Pinnacle
   project" gap flagged repeatedly in prior HANDOFF.md versions.
+
+
+## 2026-07-25 -- cfo_resignation false-positive investigation, deferred
+
+Live data check while building the Screener page surfaced a real accuracy
+problem: querying /api/filings showed a cfo_resignation flag (SOLV, a
+Controller/Chief Accounting Officer appointment) that clearly wasn't a CFO
+resignation at all -- the item text mentioned "Chief Financial Officer" only
+in passing (identifying who the new appointee reports to), same class of
+bug as the RTX/3M false positive found and partially fixed 2026-07-21.
+
+Attempted fix: sentence-level proximity check (require the CFO keyword and
+a resignation keyword in the SAME sentence, not just anywhere in the whole
+item body) instead of whole-body keyword co-occurrence. Ran a reclassification
+test against all 1,972 existing cfo_resignation flags (read-only, never
+modified the database): 432 survive, 1,540 would be removed under the
+stricter check.
+
+**Verified both directions with real filing text before trusting either
+number -- and found the fix itself has a real bug:**
+- LVS 2024-01-25 (correctly flagged for removal by the new check): confirmed
+  via full text -- this is an employment agreement AMENDMENT for the
+  existing CFO (compensation/severance terms), not a resignation. New logic
+  correct here.
+- AOS 2019-01-14 (INCORRECTLY flagged for removal by the new check):
+  confirmed via full text -- this is a genuine, unambiguous CFO resignation
+  ("Kita... Chief Financial Officer... advised the Company that he will
+  retire..."), CFO title and resignation word in the same real sentence.
+  The sentence-splitting regex naively splits on any ". " pattern, which
+  incorrectly breaks mid-sentence on the company's own name ("A. O. Smith")
+  -- fragmenting a single real sentence into pieces at the abbreviation
+  periods, so the CFO title and resignation word end up in different
+  fragments and the co-occurrence check fails on genuinely correct data.
+
+**Decision: reverted the sentence-proximity classifier change entirely**
+(flag_detector_8k.py restored to its last-committed whole-body-check
+version via `git checkout --`). The attempted fix is not reliable as
+implemented -- it trades one class of error (false positives from
+whole-body co-occurrence) for another (false negatives from naive sentence
+splitting on abbreviations), and was not proven net-better before being
+caught. No database changes were made either direction -- the
+reclassification script was read-only/diagnostic only (removed after use,
+app/services/reclassify_cfo_resignation.py). All 1,972 original
+cfo_resignation flags remain exactly as originally detected.
+
+**Also flagged, worth remembering:** this entire investigation focused
+narrowly on ONE of Sentinel's 5 Tier-1 flag types. auditor_change and
+material_weakness have never been spot-checked against real filing text
+the way cfo_resignation and the original RTX/3M case were. Precision
+across all flag types (not just cfo_resignation) is genuinely unverified
+and should be revisited properly -- with a better sentence-boundary
+approach (e.g. a real sentence tokenizer, or a fixed-character window
+around each keyword instead of naive period-splitting) -- once the core
+product (auth, Landing, Screener, insider-selling detector) is further
+along. Deliberately deferred, not abandoned.
