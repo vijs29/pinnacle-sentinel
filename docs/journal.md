@@ -194,3 +194,14 @@ approach (e.g. a real sentence tokenizer, or a fixed-character window
 around each keyword instead of naive period-splitting) -- once the core
 product (auth, Landing, Screener, insider-selling detector) is further
 along. Deliberately deferred, not abandoned.
+
+
+**Wordmark decision confirmed (2026-07-26).** "PINNACLE SENTINEL" wordmark
+color: Option E, #d4443f ("signal red"). Cross-checked against
+NavBar.jsx (committed this session, commit 5064ec7) -- already
+implemented correctly (icon gradient #d4443f -> #b3413e, wordmark text
+#d4443f). Styled consistently with Pinnacle Veridia's own product-specific
+color-coding convention (veridia.pinnacletranscore.com uses its own
+distinct accent color per SKU, per the brand system established in
+Pinnacle Quant's April 2026 brand work -- gold shield base, SKU-specific
+sub-label colors).
