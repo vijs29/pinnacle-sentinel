@@ -1,15 +1,18 @@
 """
-8-K Flag Detection (v1) — auditor_change, cfo_resignation, material_weakness.
+8-K Flag Detection (v1) — auditor_change, cfo_resignation, material_weakness,
+financial_restatement, debt_covenant_violation.
 
-Fetches each unprocessed 8-K's document text, splits it into "Item X.XX"
-sections, and classifies flags:
+Fetches each 8-K's document text, splits it into "Item X.XX" sections,
+and classifies flags:
 
   Item 4.01 -> auditor_change (always; 4.01 is specifically the
               "Changes in Registrant's Certifying Accountant" item)
-  Item 4.02 -> auditor_change OR material_weakness, decided by keyword
-              match in the item text (4.02 covers both non-reliance
-              restatements tied to auditor findings AND material
-              weakness disclosures)
+  Item 4.02 -> financial_restatement AND/OR material_weakness AND/OR
+              auditor_change, checked INDEPENDENTLY (not elif -- FIXED
+              2026-07-27, see classify_8k docstring)
+  Item 2.04 -> debt_covenant_violation (always; "Triggering Events That
+              Accelerate or Increase a Direct Financial Obligation" --
+              existence of the item IS the flag)
   Item 5.02 -> cfo_resignation, only if item BODY text (boilerplate
               heading stripped first) mentions both a CFO role AND a
               resignation/departure keyword (5.02's standard heading
@@ -21,8 +24,11 @@ Rate-limited to stay well under SEC's request limits.
 import re
 import subprocess
 import time
+import warnings
 import requests
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
+
+warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 
 from app.db.session import SessionLocal
 from app.models.filing import Filing, FlagEvent
@@ -38,17 +44,15 @@ def _notify(title: str, message: str):
     terminal-notifier) rather than bare osascript -- found 2026-07-22 that
     Terminal.app doesn't reliably self-register with macOS Notification
     Center for osascript-triggered notifications, but terminal-notifier
-    does register properly and its persistence (banner vs. sticky alert)
-    is configurable via System Settings -> Notifications -> terminal-notifier.
-    Best-effort -- never lets a notification failure crash the actual job
-    (e.g. if run on a machine without terminal-notifier installed)."""
+    does register properly. Best-effort -- never lets a notification
+    failure crash the actual job."""
     try:
         subprocess.run(
             ["terminal-notifier", "-title", title, "-message", message, "-sound", "default"],
             timeout=5, capture_output=True,
         )
     except Exception:
-        pass  # never let notification failures affect the actual job
+        pass
 
 ITEM_HEADING_RE = re.compile(r"Item\s+(\d+\.\d+)\.?\s*([^\n]{0,120})", re.IGNORECASE)
 ITEM_502_HEADING_RE = re.compile(r"^Item\s+5\.02\.?[^\n]*\n", re.IGNORECASE)
@@ -57,17 +61,15 @@ MATERIAL_WEAKNESS_KEYWORDS = ["material weakness", "internal control over financ
 AUDITOR_KEYWORDS = ["auditor", "accountant", "accounting firm", "pcaob", "engagement"]
 CFO_KEYWORDS = ["chief financial officer", "cfo"]
 RESIGNATION_KEYWORDS = ["resign", "resignation", "departure", "retire", "stepping down"]
+RESTATEMENT_KEYWORDS = [
+    "restate", "restatement", "non-reliance", "should no longer be relied upon",
+    "previously issued financial statements", "erroneously",
+]
 
 
 def fetch_filing_text(url: str, max_retries: int = 3):
     """Fetch + parse a filing's text, with retry/backoff on transient
-    network errors. FIXED 2026-07-23: the original version had no retry
-    handling at all -- a single ReadTimeout from sec.gov crashed the whole
-    batch job, killing it at 14,750/57,016 filings with no automatic
-    recovery. Now retries up to 3x with exponential backoff before giving
-    up on this one filing (returns None, same as before -- caller already
-    treats None as a fetch failure and leaves processed=False for retry
-    on a future run)."""
+    network errors."""
     for attempt in range(max_retries):
         try:
             resp = requests.get(url, headers=SEC_HEADERS, timeout=20)
@@ -77,7 +79,7 @@ def fetch_filing_text(url: str, max_retries: int = 3):
             return soup.get_text(separator="\n")
         except requests.exceptions.RequestException as e:
             if attempt < max_retries - 1:
-                wait = 2 ** attempt  # 1s, 2s, 4s
+                wait = 2 ** attempt
                 time.sleep(wait)
                 continue
             print(f"  WARN: fetch failed after {max_retries} attempts for {url}: {e}")
@@ -101,6 +103,14 @@ def _contains_any(text: str, keywords) -> bool:
 
 
 def classify_8k(items: dict) -> list:
+    """FIXED 2026-07-27: Item 4.02 was previously an elif chain (material
+    weakness OR auditor, first match wins) -- a pure restatement 8-K that
+    mentioned neither set of keywords produced ZERO flags, silently. Item
+    4.02 exists specifically to announce "Non-Reliance on Previously
+    Issued Financial Statements" (a restatement) -- now checked
+    independently from material_weakness and auditor_change, since a
+    single filing can legitimately be all three at once. Confluence
+    scoring wants these counted as genuinely separate signals."""
     flags = []
 
     if "4.01" in items:
@@ -112,18 +122,24 @@ def classify_8k(items: dict) -> list:
 
     if "4.02" in items:
         text = items["4.02"]
-        is_material_weakness = _contains_any(text, MATERIAL_WEAKNESS_KEYWORDS)
-        is_auditor = _contains_any(text, AUDITOR_KEYWORDS)
-        if is_material_weakness:
+        if _contains_any(text, RESTATEMENT_KEYWORDS):
+            flags.append({"flag_type": "financial_restatement", "item_code": "4.02", "snippet": text[:500]})
+        if _contains_any(text, MATERIAL_WEAKNESS_KEYWORDS):
             flags.append({"flag_type": "material_weakness", "item_code": "4.02", "snippet": text[:500]})
-        elif is_auditor:
+        if _contains_any(text, AUDITOR_KEYWORDS):
             flags.append({"flag_type": "auditor_change", "item_code": "4.02", "snippet": text[:500]})
+
+    if "2.04" in items:
+        # Debt covenant violation -- existence of this item IS the flag,
+        # same pattern as late_filing (decisions.md D-009 Category 1 scope).
+        flags.append({
+            "flag_type": "debt_covenant_violation",
+            "item_code": "2.04",
+            "snippet": items["2.04"][:500],
+        })
 
     if "5.02" in items:
         text = items["5.02"]
-        # Strip the standard boilerplate heading before keyword matching --
-        # it always contains "departure"/"appointment" regardless of actual
-        # content, and would false-positive on almost every 5.02 filing.
         body = ITEM_502_HEADING_RE.sub("", text, count=1)
         if _contains_any(body, CFO_KEYWORDS) and _contains_any(body, RESIGNATION_KEYWORDS):
             flags.append({"flag_type": "cfo_resignation", "item_code": "5.02", "snippet": body[:500]})
@@ -131,35 +147,61 @@ def classify_8k(items: dict) -> list:
     return flags
 
 
-def run(limit=None):
+def run(limit=None, rescan_all=False):
+    """rescan_all=True: process ALL 8-Ks regardless of Filing.processed --
+    needed when adding new flag types (financial_restatement,
+    debt_covenant_violation, 2026-07-27) to backfill onto filings already
+    scanned for the original three types. Dedups by (filing_id, flag_type)
+    so this never creates a duplicate FlagEvent even when revisiting
+    already-processed filings.
+
+    Caches extracted item text into Filing.raw_data (the item sections
+    dict, NOT full page text -- keeps storage bounded per decisions.md
+    D-011's "extracted sections only" discipline) so a FUTURE flag-type
+    addition can reuse already-fetched filings without a third full
+    re-fetch from SEC."""
     db = SessionLocal()
 
-    query = (
-        db.query(Filing)
-        .filter(Filing.processed.is_(False))
-        .filter(Filing.form_type == "8-K")
-    )
+    query = db.query(Filing).filter(Filing.form_type == "8-K")
+    if not rescan_all:
+        query = query.filter(Filing.processed.is_(False))
     if limit:
         query = query.limit(limit)
     filings = query.all()
 
+    existing_flag_keys = {
+        (fe.filing_id, fe.flag_type)
+        for fe in db.query(FlagEvent.filing_id, FlagEvent.flag_type)
+        .filter(FlagEvent.source_type == "disclosure").all()
+    }
+
     flags_created = 0
     fetch_failures = 0
     other_failures = 0
+    cache_hits = 0
 
     for i, filing in enumerate(filings):
         try:
-            text = fetch_filing_text(filing.filing_url)
-            time.sleep(REQUEST_DELAY_SECONDS)
+            if filing.raw_data and "items" in filing.raw_data:
+                items = filing.raw_data["items"]
+                cache_hits += 1
+            else:
+                text = fetch_filing_text(filing.filing_url)
+                time.sleep(REQUEST_DELAY_SECONDS)
 
-            if text is None:
-                fetch_failures += 1
-                continue
+                if text is None:
+                    fetch_failures += 1
+                    continue
 
-            items = extract_items(text)
+                items = extract_items(text)
+                filing.raw_data = {"items": items}
+
             detected = classify_8k(items)
 
             for d in detected:
+                key = (filing.id, d["flag_type"])
+                if key in existing_flag_keys:
+                    continue
                 db.add(FlagEvent(
                     filing_id=filing.id,
                     cik=filing.cik,
@@ -169,16 +211,11 @@ def run(limit=None):
                     filing_date=filing.filing_date,
                     details={"item_code": d["item_code"], "snippet": d["snippet"]},
                 ))
+                existing_flag_keys.add(key)
                 flags_created += 1
 
             filing.processed = True
         except Exception as e:
-            # FIXED 2026-07-23: this loop had no per-filing exception handling
-            # at all -- an unhandled ReadTimeout crashed the entire batch job
-            # at 14,750/57,016 filings with no recovery. One bad filing (bad
-            # HTML, transient DB issue, anything) must never kill the whole
-            # remaining batch. Leave filing.processed=False so it's retried
-            # on the next run; roll back only this filing's uncommitted state.
             db.rollback()
             other_failures += 1
             print(f"  WARN: unexpected error on filing {filing.id} ({filing.ticker}, "
@@ -200,6 +237,7 @@ def run(limit=None):
     db.close()
 
     print(f"Filings checked: {len(filings)}")
+    print(f"Cache hits (reused stored item text, no re-fetch): {cache_hits}")
     print(f"Fetch failures (left unprocessed, retry later): {fetch_failures}")
     print(f"Other failures (left unprocessed, retry later): {other_failures}")
     print(f"Flags created: {flags_created}")
@@ -210,4 +248,5 @@ def run(limit=None):
 if __name__ == "__main__":
     import sys
     limit = int(sys.argv[1]) if len(sys.argv) > 1 else 50
-    run(limit=limit)
+    rescan_all = "--rescan-all" in sys.argv
+    run(limit=limit, rescan_all=rescan_all)

@@ -525,3 +525,64 @@ a mismatch against Quant's own convention.
 
 Final asset: ui/public/pinnacle-logo.svg (shield+P icon only, 1189
 bytes), used via <img src="/pinnacle-logo.svg"> in NavBar.jsx.
+
+
+## 2026-07-27 (cont'd) -- Category 1 expansion: debt covenants, restatements, SEC investigation search
+
+**8-K classifier extended (flag_detector_8k.py):**
+- Item 4.02 fixed from an elif chain to independent checks --
+  financial_restatement, material_weakness, and auditor_change can now
+  all fire on the same filing (previously only one, first-match-wins).
+  Item 4.02 exists specifically to announce "Non-Reliance on Previously
+  Issued Financial Statements" (a restatement) -- this flag type
+  literally didn't exist before today.
+- Item 2.04 (debt covenant violation / triggering event) added --
+  existence-based, same pattern as late_filing.
+- run() reworked: rescan_all mode (backfills new flag types onto
+  already-processed filings), dedup by (filing_id, flag_type) so
+  re-scanning never duplicates, and raw_data caching (extracted item
+  sections, not full page text) so future flag-type additions won't
+  need a third full re-fetch from SEC.
+- Full 57,066-filing rescan launched (PID 53402) to backfill the two
+  new types across all previously-processed 8-Ks.
+
+**SEC full-text investigation search built (investigation_search.py):**
+New service querying efts.sec.gov (D-010) for sec_subpoena,
+sec_investigation, whistleblower_complaint mentions across 10-K/10-Q/8-K
+filings. Two real bugs found via a live test call before trusting it:
+- EFTS's actual response uses ciks (plural, array) and root_forms
+  (plural, array) -- singular cik/root_form (what several published code
+  examples assumed) silently return None, which would have filtered out
+  100% of real results without ever raising an error.
+- display_names format is "Company Name  (CIK 0000000000)", not a
+  ticker in parentheses as first assumed -- switched to looking up
+  ticker from our own universe.csv instead of parsing SEC's response.
+- Separately: NoReferencedTableError on first real run -- this script
+  only imported FlagEvent, never QuantScore, so SQLAlchemy couldn't
+  resolve flag_events.quant_score_id's foreign key at flush time. Fixed
+  by importing QuantScore even though this script never uses it directly
+  -- needed purely to register its table in shared metadata.
+
+Test run (2025-01-01 to 2025-12-31, 4 phrase queries): 259 total EDGAR
+hits, 45 within our 503-company universe, 40 new flags created. Spot-
+checked 10 most recent -- tickers resolved correctly, form types
+sensible (mostly 10-Q, consistent with ongoing legal-matter disclosure
+patterns), phrases match flag types.
+
+**Also fixed this session:** requirements.txt had two stale/wrong pins
+(pandas==3.0.3 was never actually installed, real version is 2.3.3;
+yfinance==0.2.54 vs actually-installed 0.2.66) -- corrected both.
+Separately found and fixed a shell environment issue: ~/.bashrc
+auto-activates pinnacle-platform's venv in every new terminal, and its
+activate script hardcodes a generic "(.venv) " prompt label regardless
+of which project's venv is actually active -- meaning today's session
+partially ran under the WRONG venv without any visible indication.
+Added per-project venv aliases (venv-sentinel, venv-quant, venv-veridia)
+that override PS1 with a distinct colored label after activation.
+
+Next: going-concern language (10-K full-text, single-period detection --
+first real full-text ingestion piece of D-010), then related-party
+transactions and revenue-recognition changes (both need year-over-year
+diffing, hardest of the seven), then DEF 14A executive comp red flags.
+No flags deferred -- full commitment to all 7 Category 1 items per
+explicit instruction.
