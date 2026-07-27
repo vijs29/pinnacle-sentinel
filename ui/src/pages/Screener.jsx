@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import NavBar from '../components/NavBar'
+import RaqaFooter from '../components/RaqaFooter'
 import { apiFetch } from '../api/client'
 
 const FLAG_LABELS = {
@@ -120,6 +121,7 @@ export default function Screener() {
           </div>
         )}
       </div>
+      <RaqaFooter />
     </div>
   )
 }

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import NavBar from '../components/NavBar'
+import RaqaFooter from '../components/RaqaFooter'
 import { apiFetch } from '../api/client'
 
 const FLAG_LABELS = {
@@ -165,11 +166,7 @@ export default function Landing() {
         </div>
       </div>
 
-      <div style={{ borderTop: '1px solid var(--border)', padding: '24px', textAlign: 'center' }}>
-        <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-          PINNACLE SENTINEL — a RAQA Consultancy LLC product
-        </span>
-      </div>
+      <RaqaFooter />
     </div>
   )
 }
