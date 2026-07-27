@@ -586,3 +586,51 @@ transactions and revenue-recognition changes (both need year-over-year
 diffing, hardest of the seven), then DEF 14A executive comp red flags.
 No flags deferred -- full commitment to all 7 Category 1 items per
 explicit instruction.
+
+
+## 2026-07-27 (cont'd) -- QA pass via Claude in Chrome across all three products
+
+Used claude-in-chrome to check Quant (live), Veridia (live), and Sentinel
+(local dev) pages. Findings:
+
+- Quant/Veridia live sites: RaqaFooter correctly absent -- confirmed this
+  is a deploy gap, not a code bug. RaqaFooter commits ARE pushed to both
+  repos (Quant ae7acec, Veridia 325170d) but EC2's `app` containers run
+  images built from source at explicit rebuild time, not auto-updated on
+  git push. Redeploy needed to actually surface it live.
+- Quant methodology/live-data cross-check: bollinger_breach live 3d/5d
+  numbers currently negative, appears to contradict the 2026-07-22
+  "corrected to bullish" methodology finding -- flagged for Vijay's own
+  review, likely early-live-sample noise on a recent correction, not
+  chased further here (Quant's own statistics, outside this session's
+  scope).
+- Sentinel (real bug, fixed): Landing.jsx, Screener.jsx, and
+  Methodology.jsx all had hardcoded flag-type lists that predated today's
+  Category 1 additions (financial_restatement, debt_covenant_violation,
+  going_concern, sec_subpoena, sec_investigation, whistleblower_complaint)
+  -- missing from FLAG_LABELS/FLAGS arrays in all three files. Caused:
+  Landing's category breakdown undercounting (8 shown vs 11 real),
+  Screener's filter dropdown showing raw snake_case instead of labels,
+  and tierBadge() defaulting all new types to WATCH regardless of actual
+  severity. Fixed all three; added SEVERE_FLAG_TYPES set in Screener.jsx
+  so going_concern/sec_subpoena/sec_investigation/whistleblower_complaint/
+  financial_restatement now correctly badge as ALERT. Verified visually
+  in browser after fix: all 11 flag types show on Landing/Methodology,
+  Screener dropdown shows readable labels, STZ going_concern now badges
+  ALERT correctly.
+
+Also added: RaqaFooter (seal logo + "RAQA CONSULTANCY" wordmark, links to
+raqa.pinnacletranscore.com) to all pages across Sentinel, Quant, and
+Veridia. Raqa homepage itself built as a separate repo (raqa-consultancy,
+github.com/vijs29/raqa-consultancy) and deployed live at
+raqa.pinnacletranscore.com via the shared EC2 Caddy instance (static
+file_server block, no new container -- Caddy mounts the repo directory
+read-only). Verified: DNS (Route 53 A record), Caddy config edit (tab-
+indentation matched exactly after an initial space-based mismatch),
+container recreate via --no-deps caddy (confirmed app/veridia-app
+untouched, both still 200 after restart).
+
+Still open: navbar "back to RAQA" link in each product's own nav (not
+just the footer) for deep-page discoverability -- icon+label vs icon-
+only still pending Vijay's call. Quant/Veridia EC2 redeploy still needed
+to surface RaqaFooter and other recent commits live.

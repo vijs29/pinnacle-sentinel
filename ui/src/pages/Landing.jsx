@@ -13,6 +13,12 @@ const FLAG_LABELS = {
   beneish_manipulation_risk: 'Earnings manipulation risk',
   altman_distress: 'Financial distress',
   sloan_ratio_high: 'Accrual quality',
+  financial_restatement: 'Financial restatement',
+  debt_covenant_violation: 'Debt covenant violation',
+  going_concern: 'Going concern',
+  sec_subpoena: 'SEC subpoena',
+  sec_investigation: 'SEC investigation',
+  whistleblower_complaint: 'Whistleblower complaint',
 }
 
 function flagColor(flagType) {

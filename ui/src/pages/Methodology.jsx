@@ -7,6 +7,11 @@ const FLAGS = [
   { name: 'CFO resignation', detail: '8-K Item 5.02, classified on the body text.' },
   { name: 'Material weakness', detail: '8-K Item 4.02 when weakness-related, or 10-K disclosure.' },
   { name: 'Accelerated insider selling', detail: 'Form 4, against a per-insider historical baseline.' },
+  { name: 'Financial restatement', detail: '8-K Item 4.02 -- non-reliance on previously issued financial statements.' },
+  { name: 'Debt covenant violation', detail: '8-K Item 2.04 -- a triggering event accelerating a financial obligation.' },
+  { name: 'Going concern', detail: '10-K audit opinion language -- substantial doubt about continuing operations.' },
+  { name: 'SEC subpoena / investigation', detail: 'Full-text search across 10-K/10-Q/8-K for disclosed investigations.' },
+  { name: 'Whistleblower complaint', detail: 'Full-text search for disclosed whistleblower complaints.' },
 ]
 
 const QUANT_FLAGS = [

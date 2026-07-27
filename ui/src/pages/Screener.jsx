@@ -12,10 +12,22 @@ const FLAG_LABELS = {
   beneish_manipulation_risk: 'Earnings manipulation risk',
   altman_distress: 'Financial distress',
   sloan_ratio_high: 'Accrual quality',
+  financial_restatement: 'Financial restatement',
+  debt_covenant_violation: 'Debt covenant violation',
+  going_concern: 'Going concern',
+  sec_subpoena: 'SEC subpoena',
+  sec_investigation: 'SEC investigation',
+  whistleblower_complaint: 'Whistleblower complaint',
 }
 
+const SEVERE_FLAG_TYPES = new Set([
+  'beneish_manipulation_risk', 'altman_distress', 'material_weakness',
+  'going_concern', 'sec_subpoena', 'sec_investigation', 'whistleblower_complaint',
+  'financial_restatement',
+])
+
 function tierBadge(flagType) {
-  const isSevere = flagType === 'beneish_manipulation_risk' || flagType === 'altman_distress' || flagType === 'material_weakness'
+  const isSevere = SEVERE_FLAG_TYPES.has(flagType)
   return {
     label: isSevere ? 'ALERT' : 'WATCH',
     color: isSevere ? 'var(--red)' : 'var(--amber)',
