@@ -32,6 +32,12 @@ warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 
 from app.db.session import SessionLocal
 from app.models.filing import Filing, FlagEvent
+from app.models.quant_score import QuantScore  # noqa: F401 -- registers
+# quant_scores in shared metadata so FlagEvent.quant_score_id's FK
+# resolves at flush time (same bug hit in investigation_search.py and
+# going_concern_detector.py earlier today -- missed applying it here
+# until the live rescan started silently dropping financial_restatement
+# and debt_covenant_violation flags, 2026-07-27)
 
 SEC_HEADERS = {"User-Agent": "Vijay Sentinel vijay.cloudarchitect@gmail.com"}
 REQUEST_DELAY_SECONDS = 0.2

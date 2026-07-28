@@ -1,5 +1,9 @@
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 from app.api.auth import router as auth_router
 
@@ -15,9 +19,35 @@ app.add_middleware(
 
 app.include_router(auth_router)
 
-@app.get("/")
-def root():
-    return {"status": "ok", "product": "Pinnacle Sentinel"}
+
+@app.on_event("startup")
+def _startup():
+    # Ensure all tables exist. create_all is idempotent -- only creates
+    # MISSING tables, never alters/drops existing ones. Every model must
+    # be imported here first so SQLAlchemy registers its table on
+    # Base.metadata BEFORE create_all runs and before any FK needs to
+    # resolve it -- this is exactly the fix for the NoReferencedTableError
+    # (flag_events.quant_score_id -> quant_scores) that broke
+    # investigation_search.py, going_concern_detector.py, and
+    # flag_detector_8k.py separately today (2026-07-27) until each was
+    # patched by hand to import QuantScore. Registering every model here,
+    # once, at real startup, makes that whole class of bug impossible
+    # going forward for any future script that imports app.api.main
+    # first (which any script run through the API process does).
+    from app.db.base import Base
+    from app.db.session import engine
+    from app.models import filing, user, financial_fact, quant_score  # noqa: F401
+    Base.metadata.create_all(engine)
+
+    from app.services.scheduler_service import start_scheduler
+    start_scheduler()
+
+
+@app.get("/api/scheduler")
+def scheduler_state():
+    from app.services.scheduler_service import scheduler_status
+    return scheduler_status()
+
 
 @app.get("/api/health")
 def health():
@@ -64,7 +94,8 @@ def get_filings(
                 form_type = filing.form_type
                 filing_url = filing.filing_url
             else:
-                company_name = _company_name_for_cik(flag.cik)
+                company_name = _company_name_for_cik(
+flag.cik)
                 form_type = (flag.details or {}).get("score_type")
                 filing_url = None
 
@@ -102,3 +133,26 @@ def get_flags_summary():
                 "total": sum(count for _, count in rows)}
     finally:
         db.close()
+
+
+# --------------------------------------------------------------------------
+# Static UI serving (production only -- local dev uses Vite's own dev server
+# on :5180 instead, per CORS origin above). Built React app lives in
+# ui/dist/ after `npm run build`. Mounted LAST so it never shadows /api/*
+# routes -- FastAPI matches routes in registration order, and StaticFiles'
+# catch-all would otherwise intercept API calls first.
+# ---------------------------------------------------------------------------
+_UI_DIST = Path(__file__).resolve().parents[2] / "ui" / "dist"
+
+if _UI_DIST.exists():
+    app.mount("/assets", StaticFiles(directory=_UI_DIST / "assets"), name="assets")
+
+    @app.get("/{full_path:path}")
+    def serve_spa(full_path: str):
+        """Catch-all for client-side routing (react-router) -- any path
+        not matched by an API route above serves index.html, letting the
+        React app's own router handle it."""
+        requested = _UI_DIST / full_path
+        if requested.is_file():
+            return FileResponse(requested)
+        return FileResponse(_UI_DIST / "index.html")

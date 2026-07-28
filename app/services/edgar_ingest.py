@@ -22,7 +22,13 @@ from app.models.filing import Filing
 SEC_HEADERS = {"User-Agent": "Vijay Sentinel vijay.cloudarchitect@gmail.com"}
 SUBMISSIONS_URL = "https://data.sec.gov/submissions/CIK{cik}.json"
 
-TARGET_FORMS = {"4", "8-K", "NT 10-K", "NT 10-Q"}
+TARGET_FORMS = {"4", "8-K", "NT 10-K", "NT 10-Q", "10-K", "10-Q", "DEF 14A"}
+# FIXED 2026-07-27: plain 10-K/10-Q were never ingested at all (only
+# their late-filing variants NT 10-K/NT 10-Q were) -- needed now for
+# full-text detection (going-concern, restatements, related-party,
+# revenue-recognition changes, decisions.md D-009 Category 1 expansion).
+# DEF 14A (proxy statement) added same day -- needed for executive
+# compensation red flags, the last Category 1 flag type per D-009/D-010.
 
 UNIVERSE_PATH = Path(__file__).resolve().parents[2] / "app" / "config" / "universe.csv"
 

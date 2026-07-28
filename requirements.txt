@@ -11,3 +11,5 @@ pandas==2.3.3
 html5lib==1.1
 email-validator==2.3.0
 yfinance==0.2.66
+python-jose==3.3.0
+passlib==1.7.4

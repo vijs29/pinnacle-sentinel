@@ -6,3 +6,7 @@ __pycache__/
 node_modules/
 ui/dist/
 .DS_Store
+sentinel_dump.pgdump
+sentinel_dump.sql.gz
+sentinel_dump.sql
+*.pgdump
