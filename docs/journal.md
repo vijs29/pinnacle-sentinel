@@ -634,3 +634,57 @@ Still open: navbar "back to RAQA" link in each product's own nav (not
 just the footer) for deep-page discoverability -- icon+label vs icon-
 only still pending Vijay's call. Quant/Veridia EC2 redeploy still needed
 to surface RaqaFooter and other recent commits live.
+
+
+## 2026-07-28 -- revenue_recognition_change built and verified (contrast with D-014)
+
+Built revenue_recognition_detector.py (10-K, year-over-year), using
+word-overlap (Jaccard) similarity on the "Revenue Recognition" policy
+note rather than entity extraction -- a deliberately different approach
+from related_party_change (D-014, disabled) after that one's entity-
+extraction method failed to converge. Verified against a REAL filing
+(Devon Energy's actual 10-K, fetched live) before writing any code, to
+confirm the heading's real structure rather than guessing from
+synthetic examples alone -- confirmed it renders as a standalone
+capitalized line, and that the note commonly spans multiple sub-
+headings (Upstream Revenues, Oil sales, etc.).
+
+Three real bugs found via spot-check before trusting it, each fixed
+with a genuinely different mechanism (not repeated patches of the same
+kind):
+1. Typo: function defined as find_prior_year_10h, called as
+   find_prior_year_10k -- pure NameError, one-character fix.
+2. Word-count-based prose detection (both a full-6000-char-window and
+   a narrower 500-char-window version) failed on real deferred-tax
+   reconciliation tables -- these have MANY rows, each with a
+   legitimate multi-syllable English label ("liabilities", "deferred",
+   "compensation"), so a "Revenue recognition" LINE-ITEM in a tax table
+   could accumulate enough real words to pass a word-count check,
+   despite containing zero actual policy prose. Confirmed via ACN,
+   whose real 2024 10-K correctly extracted genuine ASC 606 policy
+   language, but whose 2025 10-K kept matching a deferred-tax table
+   instead, even after two different word-count-based fixes.
+3. FIXED via digit density instead of word count -- a structurally
+   different signal (grammar vs. numeric table). Verified against the
+   exact real ACN snippets: genuine prose measured 0.055 digit density,
+   the tax-table false match measured 0.391 -- confirmed and applied.
+
+Final verified run (50 filings, rescan_all): 5 flags, all inspected --
+ABBV (rebate provision policy), ADBE (cloud-subscription revenue
+description), AOS x2 (product-line revenue discussion) -- all genuine
+prose, no table artifacts, no boilerplate. ACN correctly produces NO
+flag (rejected the tax-table false match, had no other valid match) --
+a correct "no data" outcome, not a wrong flag.
+
+**Contrast with D-014**: unlike related_party_change, this detector
+converged to something trustworthy. Difference in approach: aggregate
+statistical similarity (Jaccard) proved more robust to real-world
+document noise (page breaks, table artifacts) than discrete entity
+extraction did, because noise that appears symmetrically in both years
+biases toward "looks unchanged" (a safer, quieter failure mode) rather
+than manufacturing false specific claims about named individuals.
+
+flag_type: revenue_recognition_change. NOT yet wired into
+scheduler_service.py -- run manually for now, same status as the other
+recently-built detectors, pending a broader "wire everything into the
+scheduler" pass.
