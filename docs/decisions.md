@@ -310,3 +310,70 @@ approach (e.g. explicitly locating and excluding the Security Ownership
 table by its own distinct heading before running relationship-word
 matching, or a real NLP/LLM-based extraction instead of regex
 heuristics) if this becomes a priority again.
+
+
+## D-015 -- Known limitation: say_on_pay_failure detector not reliable, disabled (2026-07-28)
+
+Built executive_comp_detector.py against 8-K Item 5.07 (Submission of
+Matters to a Vote of Security Holders), targeting Say-on-Pay approval
+percentage as a real, verifiable numeric signal (deliberately NOT
+DEF 14A compensation-discussion prose, to avoid D-014's fragility).
+
+Extraction logic went through 5 real fix rounds, each verified against
+REAL 8-K filings (Micron, eBay, Eastman Chemical, Chevron, A.H. Belo,
+AsiaInfo, Zoom Telephonics, plus MMM's actual 2024 say-on-pay failure
+found via a live database spot-check -- 45.31% approval, shareholders
+explicitly "did not approve"):
+1. Original symmetric before/after window bled backward into an
+   EARLIER, unrelated proposal (V's director-election vote percentage
+   wrongly grabbed as say-on-pay data).
+2. Bare "for" matched ordinary English prose ("accounting firm for
+   2026") as if it were a vote-table label.
+3. Case-sensitivity bugs when tightening the FOR-label pattern (broke
+   real "Votes For" Title Case matches while fixing the false positive).
+4. Missing support for the "labels-block-then-numbers-block" table
+   style (FOR/AGAINST/ABSTAIN listed together, THEN all their numbers
+   together in the same order) -- this format caused MMM's real 2024
+   failure to go completely undetected under the original logic.
+5. Added block-table support, but this surfaced the ROOT, unresolved
+   problem: MMM's real filing contains MULTIPLE FOR/AGAINST/ABSTAIN
+   tables in the same document (say-on-pay proposal, a separate
+   shareholder proposal, AND director-election results each use this
+   identical table structure) -- the detector cannot reliably
+   distinguish which table belongs to the say-on-pay proposal
+   specifically vs. an adjacent, differently-purposed proposal. Final
+   verified check: still matched 93.99% for MMM's 2024 filing instead
+   of the real 45.31% -- a DIFFERENT wrong table, not the intended one.
+
+Also observed clearly implausible percentage-method results even after
+fixes (SW 0.31%, OXY 2.72%, ACGL showing the IDENTICAL 6.75% across two
+different fiscal years -- a strong signal of the same class of bug,
+matching an unrelated nearby percentage rather than the real say-on-pay
+outcome specifically).
+
+**Root cause, unresolved**: correctly associating a vote-count table
+with the SPECIFIC proposal it belongs to, when a single 8-K commonly
+contains several near-identical-looking tables for different proposals
+(director elections, auditor ratification, shareholder proposals,
+say-on-pay) side by side. Proximity-based window search cannot reliably
+disambiguate these. Would need the document parsed into distinct
+"Proposal No. X" sections FIRST, then searched within each section
+independently -- a real structural redesign, not a regex patch.
+
+**Decision: flag_events.say_on_pay_failure is NOT populated in
+production.** All test-run flags deleted. Detector code remains in the
+repo (app/services/executive_comp_detector.py) as a documented, honest
+attempt with real partial value (the core numeric-signal concept is
+sound, several genuine extraction-format bugs were found and fixed) --
+not wired into scheduler_service.py, not run against the full universe.
+Revisit only with the proposal-section-boundary-aware redesign
+described above.
+
+**Category 1 status**: 9 of the original 7+2 = ~9 target flag types
+built and trusted in production (late filing, auditor change, CFO
+resignation, material weakness, debt covenant violation, financial
+restatement, going concern, SEC investigation/subpoena/whistleblower,
+revenue recognition change). Two attempted and honestly disabled:
+related_party_change (D-014), say_on_pay_failure (D-015) -- both
+represent real signal concepts worth revisiting with more careful
+document-structure-aware approaches, not abandoned ideas.
