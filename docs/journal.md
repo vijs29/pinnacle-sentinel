@@ -688,3 +688,59 @@ flag_type: revenue_recognition_change. NOT yet wired into
 scheduler_service.py -- run manually for now, same status as the other
 recently-built detectors, pending a broader "wire everything into the
 scheduler" pass.
+
+
+## 2026-07-28 (end of session) -- NEXT: Sentinel -> Veridia -> Quant cross-platform integration
+
+Vijay's directive for the next session: connect Sentinel's 12 valid,
+trusted flags (see below) to Veridia's VaR forecasts and Quant's
+signals. "Each platform must have an identical table which is visible
+on UI." Explicit instruction: "WE BUILD DATA FIRST AND ANALYSE LATER"
+-- i.e. get the join/capture pipeline working and populated with real
+data before designing any scoring/alerting logic on top of it.
+
+### Sentinel's 12 valid, tested, production-trusted flags (as of today)
+Disclosure-based (9): late_filing, auditor_change, cfo_resignation,
+material_weakness, debt_covenant_violation, financial_restatement,
+going_concern, sec_subpoena/sec_investigation/whistleblower_complaint,
+revenue_recognition_change.
+Quantitative (3): beneish_manipulation_risk, altman_distress,
+sloan_ratio_high.
+(Two more attempted and honestly disabled, NOT counted above:
+related_party_change/D-014, say_on_pay_failure/D-015 -- both need a
+document-structure-aware redesign, not more regex patching.)
+
+### Planned architecture (not yet built)
+1. New table -- flag_market_context (name TBD) -- capturing, per
+   approved flag: the flag itself (ticker, filing_date, flag_type),
+   Veridia's VaR forecast for that ticker around that date, and Quant's
+   signal state (from the predictions table) around that date.
+2. Postgres can't join across separate databases directly (pinnacle vs
+   pinnacle_sentinel, same server) -- Sentinel needs its own read-only
+   cross-database access to Quant's and Veridia's tables, same pattern
+   as the existing veridia_ro user Quant already has for Veridia's data.
+   Need to set this up on the EC2 box (ALTER/GRANT on pinnacle-db-1)
+   before writing the linker.
+3. A linker service in Sentinel walks the 12 trusted flag types, looks
+   up the corresponding VaR + signal data by ticker/date proximity,
+   writes the joined row.
+4. Was about to inspect Quant's real schema (predictions table) via
+   `\dt` and `\d predictions` on pinnacle-db-1 when the session ended
+   -- need Quant's actual column names (ticker, signal state, price at
+   signal, timestamp) and Veridia's actual VaR forecast table/column
+   names before designing the linker precisely, rather than guess.
+5. "Each platform identical table on UI" -- build in Sentinel first
+   (the origin/trigger) and prove the pipeline with real data; extend
+   identically to Quant's and Veridia's own UIs once proven -- either
+   by giving them read access to the same joined table, or having them
+   call Sentinel's API. Decision on which approach: TBD, not yet made.
+
+### Also still open from earlier today (unchanged, not started)
+- Shared Postgres password rotation (tracked in Claude's memory as a
+  TODO -- careful multi-step sequence needed, touches Quant's live
+  connection too).
+- D-014/D-015 redesigns if revisited.
+- Wiring the 9 working disclosure detectors into scheduler_service.py
+  for automated daily/weekly runs (currently all manual).
+- Auth system real-world end-to-end test (register/login/logout).
+- Watchlist real feature (currently a stub).
