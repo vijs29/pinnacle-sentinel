@@ -267,3 +267,46 @@ companies' pre-split-year scores run low relative to their true value.
 Revisit only with a more rigorous approach (e.g. cross-referencing
 actual "stock split" 8-K filings, already ingested, to distinguish real
 splits from spin-off artifacts) if Altman precision becomes a priority.
+
+
+## D-014 -- Known limitation: related_party_change detector not reliable, disabled (2026-07-28)
+
+Built related_party_detector.py against DEF 14A (Item 404 of Regulation
+S-K), after the original 10-K Item 13 attempt failed outright (large-cap
+filers almost universally "incorporate by reference" to the proxy,
+leaving no real content in the 10-K itself -- confirmed via AWK, AIG,
+AMCR, MO, AEE).
+
+DEF 14A version went through 4 real fix rounds, each solving a genuine,
+distinct problem: (1) wrong section instance (grabbed the table-of-
+contents mention, not real content -- fixed by taking the LAST heading
+occurrence); (2) naive entity extraction caught debt-instrument/product/
+regulator names (MRK's own drug Keytruda, IDEXX's own product, the EPA)
+-- fixed by requiring a name + dollar figure + explicit relationship
+word in the same sentence; (3) boilerplate subsection headings ("Other
+Transactions") caught as fake names -- fixed via targeted stopwords;
+(4) lowercase mid-sentence POLICY references (describing the approval
+process, not actual transactions) matched as if they were the real
+section heading -- fixed by requiring the heading match to be
+capitalized in the source.
+
+Did NOT converge. Final round (spot-checked before shipping, not
+after) still showed: whitespace/table-of-contents artifacts as fake
+entities (CPRT); the FILER'S OWN NAME mangled by HTML-to-text spacing
+("Con \n\n\nEdison") caught as a newly-discovered related party of
+itself (ED); and, the real remaining root cause -- "beneficial owner"/
+"beneficially owns" are the SAME phrases used in the mandatory,
+routine Security Ownership table (listing officer/director share
+counts, present in every proxy, never a red flag) as in genuine
+related-party narratives. This confound sits underneath the entity-
+extraction approach as designed and was not resolved.
+
+**Decision: flag_events.related_party_change is NOT populated in
+production.** All test-run flags deleted. The detector code remains in
+the repo (app/services/related_party_detector.py) as a documented,
+honest attempt -- not wired into scheduler_service.py, not run against
+the full universe. Revisit only with a fundamentally different
+approach (e.g. explicitly locating and excluding the Security Ownership
+table by its own distinct heading before running relationship-word
+matching, or a real NLP/LLM-based extraction instead of regex
+heuristics) if this becomes a priority again.
