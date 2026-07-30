@@ -434,3 +434,99 @@ insider_transactions for multiple distinct insiders selling within a
 (flag_type="accelerated_insider_selling"). This is purely the
 ingestion/parsing layer -- the detector itself is the next step, once
 enough real data has accumulated to test cluster logic against.
+
+
+## D-017 -- Ansible deploy gap found + fixed; shared-content architecture decided (2026-07-29)
+
+### Real gap found in existing production deployment automation
+
+Investigating why Sentinel's Methodology/NavBar/Infrastructure UI
+changes weren't in production yet led to discovering pinnacle-infra
+(a separate Ansible repo, already built with working roles for all
+three products -- pinnacle_quant, pinnacle_veridia, pinnacle_sentinel,
+plus common/postgres roles and a real deploy.yml/setup.yml/rollback.yml).
+
+Found a real, live problem before running it against production: all
+three roles' git-pull tasks use plain unauthenticated HTTPS
+(`https://github.com/vijs29/{repo}.git`), and vault.yml has no
+git-credential variable at all. Confirmed via a --check --diff dry run
+against Sentinel specifically: the dry run succeeded (showed a real,
+correct diff), but a direct check of the actual EC2 git remote showed
+it had ALREADY been silently reset to plain HTTPS -- overwriting the
+manually-configured SSH deploy key (github-sentinel alias) set up
+earlier this same session. Ansible's git module enforces the remote to
+match what's specified in the role, even during some check-mode runs.
+This means any future deploy (manual or automated) touching Sentinel's
+private repo would fail without a real fix -- not a hypothetical risk,
+an active one.
+
+**Decision**: rather than re-fix the remote manually (Ansible would
+just silently overwrite it again next run), fix the ROLE itself. Vijay
+chose ONE fine-grained GitHub Personal Access Token (Contents:
+read-only), scoped to all three product repos, stored in vault.yml as
+vault_github_token, over separate per-repo tokens/SSH keys. Tradeoff
+made explicit and accepted: simpler to manage, but a single point of
+compromise affects all three repos, unlike the individually-revocable
+per-repo SSH deploy keys used elsewhere (Sentinel, RAQA). Vault token
+added; role task updates to use it -- IN PROGRESS, not yet applied to
+all three roles' git tasks as of this writing.
+
+### Shared-content architecture decision
+
+Separately, comparing today's real work against FOUNDER_OPERATING_MANUAL.md
+and PLATFORM_INTEGRATION.md (both uploaded from Quant's repo) surfaced a
+real, structural staleness problem: Quant's own Infrastructure.jsx page
+(copied verbatim into Sentinel earlier today) shows Ansible as "in
+progress" with every item marked "planned" -- but pinnacle-infra's
+roles, discovered today, are real and already working. The page was
+stale the moment it was copied, and will drift further every time any
+one product's copy gets edited without the others.
+
+**Decision**: pinnacle-infra becomes the single source of truth for
+content shared across all three products -- FOUNDER_OPERATING_MANUAL.md,
+PLATFORM_INTEGRATION.md, and the Infrastructure page's actual content --
+templated into each product repo by Ansible AT DEPLOY TIME, the same
+mechanism already used for .env generation from vault variables.
+Deliberately NOT live runtime API calls between products (e.g. Sentinel
+fetching Quant's own infrastructure content at page-load): that would
+create a live cross-product dependency, directly conflicting with
+FOUNDER_OPERATING_MANUAL.md's own fail-silent principle (Section 5) --
+a product page should never break because a DIFFERENT product's server
+is briefly unavailable. Vijay confirmed this direction; NOT YET BUILT --
+scoped as its own follow-up task, deliberately sequenced after today's
+documentation updates per Vijay's explicit instruction ("update
+documents before attempting the tasks").
+
+### Other real discrepancies found, flagged as open (not resolved here)
+
+1. **Six-Stage Signal Gauntlet gap**: FOUNDER_OPERATING_MANUAL.md states
+   "No signal goes LIVE without passing all six stages. There are no
+   exceptions." None of Sentinel's 12 built flags have been through
+   walk-forward backtesting, factor-model validation, or forward
+   validation -- only real-filing data-extraction has been verified.
+   By the Manual's own definition, these flags are deployed but not
+   "LIVE." Flagged in strategy.md; not resolved -- needs Vijay's
+   explicit call on how to treat currently-deployed-but-unvalidated
+   flags.
+2. **Brand color conflict**: FOUNDER_OPERATING_MANUAL.md specifies
+   Sentinel's accent as #dc2626. Actual deployed code uses #d4443f --
+   Vijay's own explicit choice earlier this session when offered both.
+   Real, live discrepancy between the written standard and current
+   practice. Not resolved -- needs an explicit decision on which is
+   correct going forward, not a silent pick either way.
+3. **Veridia accent conflict**: #0d9488 (teal) per FOUNDER_OPERATING_MANUAL.md
+   vs #1d9e75 (green) used elsewhere (RAQA homepage work). Same kind of
+   unresolved discrepancy, affecting a different product -- flagged
+   here since it surfaced during this same document-comparison pass,
+   not Sentinel's to unilaterally resolve.
+4. **NavBar dropdown standard overgeneralized**: FOUNDER_OPERATING_MANUAL.md's
+   Section 8 states every product needs "NavBar with all dropdowns
+   (Research, Tools, Analysis, Infrastructure)" -- these are literally
+   Quant's own dropdown names, stated as a universal requirement that
+   doesn't fit Sentinel's real content (Screener/Methodology/Watchlist).
+   The Manual itself likely needs correcting to state the REQUIREMENT
+   (product-relevant dropdowns + a shared Infrastructure dropdown)
+   rather than Quant's specific implementation as if universal.
+5. **Missing required scripts**: FOUNDER_OPERATING_MANUAL.md Section 4/6
+   reference verify_deploy.sh and session_start.sh as required tooling.
+   Neither exists in Sentinel's repo. Not built.

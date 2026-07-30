@@ -64,20 +64,59 @@ scrape the same filings. The moat is:
    filing plus an auditor change plus accelerated insider selling on the
    same company in the same window is a very different, much rarer signal.
 
-## Proof methodology (planned, not yet built -- see decisions.md D-002)
+## Proof methodology (partially built -- see decisions.md D-002, D-014, D-015, D-016)
 
-Mirrors Quant's approach directly:
-1. Detect flags on filings as they're ingested (already built for 4 of the
-   5 Tier-1 flags: late filing, auditor change, CFO resignation, material
-   weakness; accelerated insider selling remains).
-2. Score confluence per company (1 flag = WATCH, 2+ = ALERT) -- not yet built.
-3. Record price at flag date (T=0), then grade at T+30/90/180/365 against
-   SPY -- track excess return, decline >10%/>20% thresholds, and the
-   extreme case (bankruptcy/delisting within 365 days).
-4. Publish the full track record, including flags that turned out to be
-   noise -- a flag type that doesn't predict anything becomes a disclosed
-   null result, exactly as PEAD and the original 12-signal technical suite
-   were honestly rejected in Pinnacle Quant's own history.
+Mirrors Quant's approach directly, though scope has grown well past the
+original 5 Tier-1 flags:
+
+**Built and trusted in production (9 disclosure-based):** late filing,
+auditor change, CFO resignation, material weakness, debt covenant
+violation, financial restatement, going concern, SEC investigation/
+subpoena/whistleblower complaint, revenue recognition change.
+
+**Built and trusted in production (3 quantitative):** Beneish M-Score,
+Altman Z-Score, Sloan accruals ratio.
+
+**Attempted, honestly disabled (not counted above):** related-party
+transaction changes (D-014) and say-on-pay vote failure (D-015) --
+both real signal concepts that didn't converge to something reliable
+after multiple verified fix attempts against real filings; documented
+with the specific unresolved root cause rather than shipped unreliable.
+
+**In progress:** accelerated insider selling (the last original Tier-1
+flag). Ingestion layer built and verified (see D-016) -- real Form 4
+XML parsed directly from SEC, not just filing references. Full
+285K-filing historical backfill running as of this writing. The
+cluster-detection logic itself (flagging multiple distinct insiders
+selling within a 30-day window) is not yet built -- next step once
+enough real data has accumulated.
+
+**Confluence scoring**: 1 flag = WATCH, 2+ = ALERT -- built and live on
+the Screener page (not "not yet built" as this document previously
+said).
+
+**Important open gap, per FOUNDER_OPERATING_MANUAL.md's own Six-Stage
+Signal Gauntlet**: none of the 12 built flags above have been through
+walk-forward backtesting, factor-model validation, or forward
+validation against real price outcomes yet -- only the underlying
+data-extraction logic has been verified against real filings. By the
+Manual's own standard ("No signal goes LIVE without passing all six
+stages"), these flags are deployed to production but not yet "LIVE" in
+the Manual's sense. This is a genuine, unresolved gap, not an oversight
+to quietly work around -- see decisions.md for the explicit decision
+on how to treat this.
+
+Remaining steps to close the gap:
+1. Record price at flag date (T=0), then grade at T+30/90/180/365
+   against SPY -- track excess return, decline >10%/>20% thresholds,
+   and the extreme case (bankruptcy/delisting within 365 days).
+2. Run each flag type through the full Six-Stage Gauntlet before
+   treating it as validated, not just deployed.
+3. Publish the full track record, including flags that turn out to be
+   noise -- a flag type that doesn't predict anything becomes a
+   disclosed null result, exactly as PEAD and the original 12-signal
+   technical suite were honestly rejected in Pinnacle Quant's own
+   history.
 
 ## What would falsify this thesis (stated in advance)
 

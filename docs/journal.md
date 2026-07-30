@@ -797,3 +797,74 @@ ingesting live EDGAR data" -- confirmed stale, Vijay opted to keep
 scope to exactly the original 5 Tier-1 flags for the composite score
 model (not all 12 built flags) -- flagged as still needing an update
 pass once the insider-selling detector is complete, not yet done.
+
+
+## 2026-07-29 (cont'd) -- Ansible deploy investigation + Founder's Manual document audit
+
+Second half of today's session, picking up after the Methodology/NavBar/
+Infrastructure UI work and the start of the insider-selling ingestion
+(both documented in the earlier entry above and in D-016).
+
+Asked why today's UI changes weren't yet in production. Learned
+deployment is meant to go through pinnacle-infra (a separate Ansible
+repo, not something built today) rather than manual SSH -- discovered
+real, working roles already exist for all three products. Investigated
+before running anything against production, per the same discipline as
+the rest of this session:
+
+- Ran a --check --diff dry run against Sentinel's role first. It
+  succeeded, showing a real, correct diff of actual pending commits.
+- But directly checking the EC2 box's real git remote (not trusting the
+  dry-run log alone) revealed it had been silently reset to plain HTTPS
+  -- overwriting the SSH deploy key (github-sentinel) manually
+  configured earlier today. Root cause: all three roles' git tasks use
+  unauthenticated HTTPS with no vault-stored credential, and Ansible's
+  git module enforces its configured remote even during some check-mode
+  operations.
+- Vijay's decision: fix with one shared, fine-grained GitHub PAT
+  (Contents: read-only, scoped to all three repos) in vault.yml, rather
+  than per-repo tokens/keys -- simpler, with the tradeoff (single point
+  of compromise vs individually-revocable keys) made explicit and
+  accepted. Vault token added. Role updates to actually USE it across
+  all three roles' git tasks -- NOT YET DONE, next step.
+
+Uploaded and read FOUNDER_OPERATING_MANUAL.md and confirmed PLATFORM_INTEGRATION.md
+and strategy.md (Sentinel's own, already existed, found significantly
+stale) -- compared all three against today's actual work. Found:
+
+1. strategy.md said "5 flags, 4 built" -- reality is 12 built, 2
+   disabled (D-014/D-015), 1 in progress (insider selling). FIXED --
+   see the "Proof methodology" section rewrite.
+2. FOUNDER_OPERATING_MANUAL.md's Six-Stage Signal Gauntlet has not been
+   applied to any of Sentinel's 12 flags -- by the Manual's own
+   definition, these flags are deployed but not "LIVE." Flagged
+   explicitly in strategy.md and D-017, not resolved.
+3. Brand color conflict: Manual says Sentinel accent #dc2626; actual
+   code uses #d4443f (Vijay's own choice earlier this session). Flagged,
+   not resolved -- needs an explicit call.
+4. Veridia accent conflict: #0d9488 (Manual) vs #1d9e75 (RAQA homepage
+   work, earlier session). Flagged, not Sentinel's to resolve alone.
+5. NavBar dropdown standard in the Manual ("Research, Tools, Analysis,
+   Infrastructure") is literally Quant's own implementation stated as a
+   universal rule -- doesn't fit Sentinel's real content. Flagged as
+   something the Manual itself likely needs correcting, not something
+   Sentinel needs to conform to as written.
+6. verify_deploy.sh and session_start.sh, referenced as required
+   tooling in the Manual, don't exist in Sentinel's repo. Not built.
+
+**Architecture decision, confirmed by Vijay**: pinnacle-infra becomes
+the single source of truth for content shared across all three products
+(FOUNDER_OPERATING_MANUAL.md, PLATFORM_INTEGRATION.md, the Infrastructure
+page's actual content), templated into each product repo by Ansible at
+deploy time -- not live runtime API calls between products, since that
+would conflict with the Manual's own fail-silent principle. This
+directly addresses the actual root cause behind items 1-2 above
+(today's Infrastructure.jsx copy already being stale the moment it was
+copied) and prevents the same class of drift recurring for future
+Pinnacle products. Confirmed as the direction; NOT YET BUILT -- Vijay
+explicitly asked to update documents first, build this architecture as
+a separate, deliberate next task.
+
+All three documents (strategy.md, decisions.md D-017, this entry)
+updated and committed before any of the above architecture/token work
+was actually implemented, per Vijay's explicit sequencing request.
