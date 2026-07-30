@@ -17,7 +17,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app/ app/
 COPY --from=ui-build /ui/dist ui/dist
 
-EXPOSE 8000
+EXPOSE 8010
 
 # Single worker ON PURPOSE: APScheduler runs inside the app process
 # (app/services/scheduler_service.py), and multiple workers would mean
@@ -26,4 +26,4 @@ EXPOSE 8000
 # (concurrent going_concern_detector runs producing duplicate
 # flag_events rows before the uq_filing_flag_type constraint existed).
 # Matches Pinnacle Quant's identical --workers 1 reasoning.
-CMD ["uvicorn", "app.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+CMD ["uvicorn", "app.api.main:app", "--host", "0.0.0.0", "--port", "8010", "--workers", "1"]

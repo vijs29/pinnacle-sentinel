@@ -938,3 +938,34 @@ backfill, cluster-detection logic itself not yet built). Shared-content-
 via-Ansible architecture (FOUNDER_OPERATING_MANUAL.md,
 PLATFORM_INTEGRATION.md, Infrastructure page content) confirmed as
 direction, not yet built.
+
+
+## 2026-07-30 (cont'd) -- Port standardization fix (real bug, corrected scope)
+
+Received a request (relayed from a Quant-side Claude session) to
+standardize Sentinel's port to 8010 and create docker-compose.prod.yml.
+Verified the real current state before acting, per this session's
+established discipline, rather than trusting the request's stated
+assumptions:
+
+- `docker-compose.prod.yml` **already existed** and was **already
+  correct** (exposes 8010) -- the request's premise that it needed to
+  be created was wrong. No changes made there.
+- **Real bug found**: Dockerfile's `CMD` hardcoded `--port 8000`, while
+  docker-compose.prod.yml already expected 8010 -- meaning the actual
+  uvicorn process inside the container was listening on a different
+  port than Docker Compose forwarded traffic to. This part of the
+  request was correct, just misdiagnosed as "needs port 8010" rather
+  than "already inconsistent internally."
+- Also found and fixed a second occurrence of the same stale port:
+  `EXPOSE 8000` in the same Dockerfile, one line above the CMD --
+  not mentioned in the original request, found by grepping the whole
+  repo for stale `8000` references before deploying.
+- Ruled out two false positives from that same grep: Infrastructure.jsx
+  line 96 (descriptive text listing all three products' ports
+  together, not a bug) and related_party_detector.py's
+  SECTION_MAX_CHARS = 8000 (an unrelated character-count constant, not
+  a port number).
+
+**Fixed**: Dockerfile CMD and EXPOSE both now say 8010, matching
+docker-compose.prod.yml. Not yet rebuilt/deployed as of this writing.
