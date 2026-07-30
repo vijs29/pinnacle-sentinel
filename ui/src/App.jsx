@@ -5,6 +5,7 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import Methodology from './pages/Methodology'
 import Watchlist from './pages/Watchlist'
+import Infrastructure from './pages/Infrastructure'
 
 export default function App() {
   return (
@@ -16,6 +17,7 @@ export default function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/methodology" element={<Methodology />} />
         <Route path="/watchlist" element={<Watchlist />} />
+        <Route path="/infrastructure" element={<Infrastructure />} />
       </Routes>
     </BrowserRouter>
   )
