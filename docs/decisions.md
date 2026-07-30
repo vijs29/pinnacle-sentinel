@@ -530,3 +530,57 @@ documents before attempting the tasks").
 5. **Missing required scripts**: FOUNDER_OPERATING_MANUAL.md Section 4/6
    reference verify_deploy.sh and session_start.sh as required tooling.
    Neither exists in Sentinel's repo. Not built.
+
+
+## D-017 (continued) -- Consolidated single pinnacle_product role built and verified (2026-07-30)
+
+Per Vijay's direction, consolidated the three near-duplicate roles
+(pinnacle_quant, pinnacle_veridia, pinnacle_sentinel) into ONE
+parameterized role (roles/pinnacle_product/), invoked three times from
+deploy.yml with per-product variables pulled from group_vars/all/vars.yml's
+existing products: list (which already had the right shape -- name,
+port, subdomain, compose_dir -- just wasn't being used by the actual
+role files; extended with repo, env_template, and compose_file fields).
+Explicitly designed to support future products (QuantInfra AI,
+Biosignal, etc.) with only a new vars.yml list entry + a new
+{name}.env.j2 template + a ~6-line deploy.yml block -- the role itself
+needs zero changes. --tags quant/veridia/sentinel selective-deploy
+behavior preserved exactly, since each invocation keeps its own tag
+(Option A -- explicit per-product blocks in deploy.yml referencing
+centralized data -- chosen over a fully dynamic loop, which would have
+required replacing --tags with --extra-vars and changed Vijay's daily
+deploy commands).
+
+Also fixed the D-017 git-auth gap as part of this: the role's git-pull
+task now uses vault_github_token (one shared fine-grained PAT, Contents
+read-only, scoped to all three repos) instead of unauthenticated HTTPS.
+
+**Real incident during this work, documented per the Founder's
+Manual's own honesty standard**: the GitHub PAT was accidentally pasted
+in plaintext during a troubleshooting exchange (a vault edit attempt
+failed silently because $EDITOR was unset, dropping the paste into the
+bash prompt instead of an editor buffer, which surfaced the token in
+plaintext). Token was immediately revoked and regenerated before any
+further use. Root cause fixed by explicitly setting $EDITOR=nano before
+retrying -- worth carrying forward as a checklist item for any future
+vault-edit session on a fresh terminal.
+
+**Second real bug found via the dry-run process itself**: initial
+consolidated role hardcoded docker-compose.prod.yml for all three
+products, but Veridia deliberately uses a DIFFERENT compose file
+(docker-compose.web.yml -- the read-only public API service, kept
+separate from docker-compose.yml's daily ledger-writing cron job as a
+safety boundary, per earlier design). Caught by an actual --check
+--diff dry run failing with a real "Cannot find Compose file" error,
+not assumed away. Fixed by adding compose_file as a per-product
+variable (vars.yml) rather than renaming Veridia's file to match the
+others for consistency -- the file split itself is intentional and
+meaningful, not accidental duplication like the three roles were.
+
+**Verified**: all three products (--tags quant, --tags veridia,
+--tags sentinel) now pass a full --check --diff dry run cleanly --
+ok=8, changed=3, failed=0 each, confirming real task execution (config
+generation, git pull, container deploy, health check all present), not
+silently skipped. NOT yet run for real against production -- dry-run
+verification only as of this writing; a real run is the natural next
+step once Vijay confirms readiness.

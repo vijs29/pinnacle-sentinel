@@ -868,3 +868,32 @@ a separate, deliberate next task.
 All three documents (strategy.md, decisions.md D-017, this entry)
 updated and committed before any of the above architecture/token work
 was actually implemented, per Vijay's explicit sequencing request.
+
+
+## 2026-07-30 -- Consolidated Ansible role built, verified via dry run across all three products
+
+Follow-up to yesterday's D-017 investigation. Built the actual
+consolidated pinnacle_product role (replacing the three near-duplicate
+per-product roles) in pinnacle-infra, parameterized off vars.yml's
+products list, explicitly designed so a future product (QuantInfra AI,
+Biosignal) needs only a new list entry + template + ~6-line deploy.yml
+block, never a role change. Fixed the git-auth gap (vault_github_token)
+as part of the same work.
+
+Real incident along the way: a GitHub PAT got pasted in plaintext when
+`ansible-vault edit` silently failed to open an editor ($EDITOR was
+unset) -- revoked and regenerated immediately, $EDITOR=nano set to
+prevent recurrence. Also caught a real bug via an actual dry run (not
+assumed): the role initially hardcoded docker-compose.prod.yml for all
+three products, but Veridia deliberately uses docker-compose.web.yml
+(a real safety boundary, not accidental inconsistency) -- fixed by
+parameterizing compose_file per product rather than renaming Veridia's
+file to force naming consistency.
+
+All three products (--tags quant/veridia/sentinel) now pass a full
+--check --diff dry run cleanly (ok=8, changed=3, failed=0 each). NOT
+yet run for real against production. Next: run for real once Vijay
+confirms, then start the shared-content-via-Ansible architecture
+(FOUNDER_OPERATING_MANUAL.md, PLATFORM_INTEGRATION.md, Infrastructure
+page content templated from pinnacle-infra) -- confirmed direction,
+not yet built, per Vijay's explicit sequencing.
