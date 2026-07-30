@@ -6,7 +6,7 @@ const FLAGS = [
   { name: 'Auditor change', detail: '8-K Item 4.01, and 4.02 when auditor-related.' },
   { name: 'CFO resignation', detail: '8-K Item 5.02, classified on the body text.' },
   { name: 'Material weakness', detail: '8-K Item 4.02 when weakness-related, or 10-K disclosure.' },
-  { name: 'Accelerated insider selling', detail: 'Form 4, against a per-insider historical baseline.' },
+  { name: 'Accelerated insider selling', detail: 'Form 4 -- multiple distinct insiders selling (not gifts or option exercises) within a 30-day window.' },
   { name: 'Financial restatement', detail: '8-K Item 4.02 -- non-reliance on previously issued financial statements.' },
   { name: 'Debt covenant violation', detail: '8-K Item 2.04 -- a triggering event accelerating a financial obligation.' },
   { name: 'Going concern', detail: '10-K audit opinion language -- substantial doubt about continuing operations.' },
@@ -180,6 +180,21 @@ export default function Methodology() {
             price outcomes -- whether flagged companies actually underperform afterward.
           </p>
         </Section>
+
+        <div style={{
+          textAlign: 'center', padding: '24px 20px', margin: '0 0 40px',
+          background: 'var(--navy-800)', border: '1px solid rgba(212,68,63,0.3)',
+          borderRadius: 12,
+        }}>
+          <div style={{ fontSize: 32, fontWeight: 800, color: 'var(--red)', letterSpacing: -0.5 }}>
+            285,526
+          </div>
+          <div style={{ fontSize: 13.5, color: 'var(--text-secondary)', marginTop: 6, lineHeight: 1.5 }}>
+            Form 4 filings scanned to build the insider-selling signal alone -- every real
+            transaction, not just the filing reference, parsed directly from SEC's own XML
+            for each one.
+          </div>
+        </div>
 
         <Section title="What we detect">
           <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1, color: 'var(--blue)', marginBottom: 10, marginTop: 4 }}>

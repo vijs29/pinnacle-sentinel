@@ -744,3 +744,56 @@ document-structure-aware redesign, not more regex patching.)
   for automated daily/weekly runs (currently all manual).
 - Auth system real-world end-to-end test (register/login/logout).
 - Watchlist real feature (currently a stub).
+
+
+## 2026-07-29 -- Platform Integration UI work + insider selling cluster ingestion started
+
+Per Vijay's brief (matching Pinnacle Quant's current state): added
+Platform Integration section to Methodology page (three product cards,
+capped/banded composite risk score 1-12 -- disclosure flags capped at
++6 regardless of how many of the 9 fire, quantitative flags capped at
++3, Veridia +2, Quant +1, preserving PLATFORM_INTEGRATION.md's approved
+1-12 ceiling even though Sentinel now has 12 real flags rather than the
+original 5 the doc's scoring table was built around -- confirmed this
+approach via an interactive mockup before implementing). D-016's
+1.78x lift / p=0.0000 stat explained in plain terms in the new section.
+
+Added NavBar Infrastructure dropdown + mobile hamburger menu
+(isMobile breakpoint 768px). Initially built linking OUT to
+quant.pinnacletranscore.com/infrastructure, corrected per Vijay's
+guidance: since the Infrastructure page content is genuinely shared
+platform information (not Quant-specific), Sentinel now hosts its OWN
+copy of the same page (Infrastructure.jsx, copied verbatim from Quant's
+real file, confirmed its NavBar/BASE_URL imports resolve correctly
+against Sentinel's own file structure), with the dropdown linking
+internally via navigate('/infrastructure?section=X') using Quant's
+real SECTIONS keys (aws, containers, ansible, terraform, security),
+confirmed directly from Quant's own Infrastructure.jsx source rather
+than guessed.
+
+Real bugs hit and fixed along the way: a giant single-line base64
+transfer for Methodology.jsx silently failed in transit (build
+succeeded because it was rebuilding the OLD unchanged file, not the
+new one) -- switched to plain multi-line heredocs for the rest of
+today's file writes, which worked reliably. A \uXXXX unicode-escape
+"fix" for Infrastructure.jsx's emoji reported success and showed 0
+remaining matches, but the verification grep pattern itself was
+subtly wrong (bash single-quote escaping meant it was checking for
+DOUBLE backslashes, not the single backslash actually in the file) --
+caught via an explicit chr(92)-based Python check showing 64 broken
+sequences remained, then genuinely fixed.
+
+Then started the insider-selling-cluster flag (the last of the
+original 5 Tier-1 flags, never built) -- see D-016 for the full
+ingestion build, the real Form 4 XML schema verification, and the two
+bugs found (fixed URL-guessing assumption -> real index.json lookup).
+Full 285K-filing backlog ingestion launched in foreground per Vijay's
+request (wants live visibility), estimated 2-3+ days runtime. Cluster-
+detection logic itself not yet built -- next session's starting point.
+
+Also: PLATFORM_INTEGRATION.md's Known Limitations / Phase 2 checklist
+(uploaded by Vijay, approved doc) still says "Pinnacle Sentinel not yet
+ingesting live EDGAR data" -- confirmed stale, Vijay opted to keep
+scope to exactly the original 5 Tier-1 flags for the composite score
+model (not all 12 built flags) -- flagged as still needing an update
+pass once the insider-selling detector is complete, not yet done.

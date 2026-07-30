@@ -377,3 +377,60 @@ revenue recognition change). Two attempted and honestly disabled:
 related_party_change (D-014), say_on_pay_failure (D-015) -- both
 represent real signal concepts worth revisiting with more careful
 document-structure-aware approaches, not abandoned ideas.
+
+
+## D-016 -- Insider selling cluster: ingestion built, cluster-detection logic still pending (2026-07-29)
+
+Built app/models/insider_transaction.py (new insider_transactions table)
+and app/services/form4_ingest.py -- the last of the original 5 Tier-1
+flags never actually parsed from real data (285,306 Form 4 filing
+REFERENCES were ingested weeks ago, but zero transaction details --
+shares, price, transaction code -- were ever extracted).
+
+Verified real Form 4 XML schema against two real filings (Ameren/AEE,
+Warner Baxter, 2017-06-09; 3M/MMM, Jennifer Rumsey, 2026-06-05) before
+writing the parser -- confirmed <nonDerivativeTransaction> elements are
+the real transactions (vs <nonDerivativeHolding>, an informational
+balance, deliberately excluded), transactionCode "S" = open-market sale
+(the only code that should count toward a selling-cluster signal --
+excludes G=gift, A=award/grant, M=option exercise, F=tax withholding),
+and rptOwnerCik as the stable per-insider identifier (not name-text
+matching, which varies in formatting -- confirmed "RUMSEY JENNIFER" vs
+"BAXTER WARNER L" vs Title-Case variants across different filers).
+
+Two real bugs found and fixed before trusting this at scale:
+1. First attempt assumed a fixed URL transform (strip "/xslF345X03/"
+   from the cached viewer-wrapper URL to get the raw XML). This broke
+   on a large fraction of a 20-filing test batch ("mismatched tag" XML
+   parse errors) -- traced to 3M's filings using a DIFFERENT viewer
+   folder name (xslF345X06) and a different primary filename
+   (form4.xml, not edgar.xml). Naming isn't fixed across filers/years.
+2. FIXED via SEC's own index.json directory listing -- looks up each
+   filing's real primary XML document dynamically rather than guessing
+   a naming convention. Re-verified: 20/20 filings parsed successfully,
+   zero failures of any kind, 42 real transaction rows created.
+
+Spot-checked the real parsed data before trusting it: 8 MMM directors
+correctly show identical share counts/prices for the same 2026-05-12
+grant date (expected -- annual director equity grants are typically
+identical dollar-value awards); a real employee's option-exercise ("M")
+correctly produced two linked rows (exercise + resulting sale, standard
+cashless-exercise pattern); a real open-market sale (Theresa Reinseth,
+2026-02-11) correctly split into 5 transactions at slightly different
+prices, matching how large sales commonly execute throughout a trading
+day.
+
+**Scale note**: 285,306 Form 4 filings x 2 requests each (index.json
+lookup + XML fetch) is a genuinely long-running job -- estimated
+2-3+ days of continuous runtime, unlike anything else ingested this
+session. Launched in the foreground (Vijay's choice, wants live
+visibility into progress/errors as it runs) rather than backgrounded,
+in a dedicated terminal, with --rescan-all against the full 285K
+backlog.
+
+**NOT yet built**: the actual cluster-detection logic (querying
+insider_transactions for multiple distinct insiders selling within a
+30-day window per ticker) and the resulting FlagEvent creation
+(flag_type="accelerated_insider_selling"). This is purely the
+ingestion/parsing layer -- the detector itself is the next step, once
+enough real data has accumulated to test cluster logic against.
