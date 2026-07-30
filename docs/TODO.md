@@ -176,10 +176,19 @@ Vijay's own account until this gauntlet is complete.
       any running container. Deliberately sequenced AFTER Sentinel's
       own in-flight health-check fix and deploy, not folded into the
       same change.
-- [ ] **Run the consolidated Ansible role for real** against production
-      (dry-run verified only, never actually executed) — this is what
-      would actually deploy today's Methodology/NavBar/Infrastructure
-      UI changes
+- [x] **Run the consolidated Ansible role for real** against
+      production -- DONE 2026-07-30 for Sentinel specifically, after
+      finding and fixing 7 real bugs along the way (see decisions.md
+      D-018: git auth, Veridia compose file, health-check networking,
+      SECRET_KEY naming, stale vault password, build:policy image
+      caching, Caddy 28-hour-stale reload). Verified live:
+      sentinel.pinnacletranscore.com returns 200, /api/health healthy.
+      Today's Methodology/NavBar/Infrastructure UI work is now
+      actually deployed for the first time (it was committed all day
+      but never really live, due to the build:policy bug).
+      NOT yet re-run for Quant or Veridia with these same fixes --
+      the shared pinnacle_product/caddy roles apply automatically once
+      deployed, but neither has actually been redeployed yet.
 - [ ] **Shared-content-via-Ansible architecture** — `pinnacle-infra`
       becoming the single source of truth for
       `FOUNDER_OPERATING_MANUAL.md`, `PLATFORM_INTEGRATION.md`, and the

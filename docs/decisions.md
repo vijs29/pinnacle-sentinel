@@ -626,3 +626,105 @@ started there, even though the actual changes are cross-product
 infrastructure work. Worth deciding whether pinnacle-infra needs its
 own documentation set, rather than continuing to track its own
 decisions inside one product's docs by convention.
+
+
+## D-018 -- First real Ansible deploy ever run: 7 real bugs found and fixed, Sentinel genuinely live (2026-07-30)
+
+Ran the consolidated pinnacle_product role for real against production
+for the first time (previously dry-run verified only). This was
+genuinely the FIRST time pinnacle-infra's automation had ever been
+exercised for real, for any product -- confirmed earlier the same day
+that the whole repo had never even been committed to git until this
+session. Every bug below was a real, previously-undiscovered defect
+in automation that looked complete on paper.
+
+**Seven real, distinct root causes found and fixed, each verified
+against real production behavior, not assumed:**
+
+1. **Git auth gap** -- unauthenticated HTTPS clone with no vault
+   credential, silently overwriting a manually-configured SSH deploy
+   key on the server. Fixed with one shared, fine-grained GitHub PAT
+   (Contents: read-only) in vault.yml.
+2. **Veridia's compose file** -- role assumed docker-compose.prod.yml
+   for all three products; Veridia deliberately uses
+   docker-compose.web.yml as a safety boundary (D-006, keeps the
+   ledger-writing cron path separate). Fixed via a per-product
+   compose_file variable.
+3. **Health check networking** -- checked http://localhost:{port} from
+   the EC2 HOST, but docker-compose.prod.yml deliberately uses
+   `expose:`, not `ports:` (confirmed the SAME pattern exists for
+   Quant too -- platform-wide, not Sentinel-specific). This check could
+   never succeed regardless of container health. Fixed by checking
+   from INSIDE the container via `docker compose exec`. Also discovered
+   check_mode gap: the original uri-based check was silently SKIPPED
+   during every --check --diff dry run all day, meaning no dry run had
+   ever actually tested it -- added check_mode: false so future dry
+   runs catch this class of bug for real.
+4. **SECRET_KEY naming mismatch** -- Sentinel's own app/core/config.py
+   reads SECRET_KEY specifically (no fallback); the vault template
+   generated JWT_SECRET instead, crashing the app on every real
+   startup. Sentinel-specific (Quant's own code expects JWT_SECRET and
+   is fine) -- fixed only sentinel.env.j2, not the shared pattern.
+5. **Stale vault Postgres password** -- vault_postgres_password had
+   never matched the real, live password (since this automation had
+   never run for real before). Fixed via a purpose-built script that
+   fetches the real value from Quant's live .env and updates the vault
+   directly, verified via SHA-256 hash comparison throughout --
+   plaintext value never displayed or logged at any point.
+6. **build: policy silently reusing a 2-day-stale image** -- confirmed
+   via `docker images` (real image build timestamp, not container
+   creation time, which is misleadingly recent on every deploy
+   regardless of whether the image itself was rebuilt) that the
+   deployed image was built 2026-07-28, TWO DAYS before any of today's
+   work. Every "successful" deploy today had silently never rebuilt
+   the image -- meaning today's Dockerfile port fix AND the
+   Methodology/NavBar/Infrastructure UI changes were never actually
+   live despite apparently-successful runs. Fixed: build: policy ->
+   build: always.
+7. **Caddy running 28 hours without a reload** -- Caddyfile on disk
+   was completely correct (all three products), but the running Caddy
+   process's own logs showed it only knew about quant.pinnacletranscore.com
+   -- config on disk being correct doesn't mean the running process
+   picked it up. The roles/caddy/ directory had been scaffolded empty
+   and never built out (same pattern as everything else found today).
+   Built a real caddy role: generates the whole Caddyfile from
+   vars.yml's products list (a future product needs only a new list
+   entry, never manual Caddyfile edits) with a reload handler, tagged
+   'always' so it runs regardless of which product's --tags a deploy
+   targets.
+8. **Handler restart race condition** -- the .env template and git-pull
+   tasks both notify a restart handler, which fires at the normal
+   Ansible flush point (end of role/play) -- meaning it could fire
+   AFTER "Wait for healthy" already passed, restarting the container
+   again right before Caddy's public-endpoint verification ran.
+   Confirmed via a real run: internal health check passed, Caddy then
+   got connection-refused moments later reaching the same container.
+   Fixed with an explicit `meta: flush_handlers` before the health
+   check, guaranteeing verification always checks the final, settled
+   state.
+
+**Tooling change made mid-session**: installed ansible-core and
+ansible-lint directly in Claude's own sandbox (via the MCP connector
+discovery flow, after Vijay asked whether Claude could be given
+testing ability) -- used for real, catching genuine correctness issues
+(no-changed-when on the health check, FQCN module names, var-naming
+convention) before shipping fixes, not just guessed-at. Does not
+provide functional/runtime testing (no Docker/EC2 access in the
+sandbox), but meaningfully raises the floor on avoidable static-
+analysis-catchable bugs going forward.
+
+**Final verified state**: PLAY RECAP failed=0. Confirmed live directly:
+`https://sentinel.pinnacletranscore.com` returns 200,
+`/api/health` returns `{"status":"healthy"}`. This deploy included a
+genuine full rebuild (bug #6's fix), so today's earlier UI work
+(Methodology page's Platform Integration section, NavBar's
+Infrastructure dropdown, the port fix) are NOW actually live for the
+first time, not just committed.
+
+**Not yet done**: same fixes (health check, build:always, caddy role)
+apply automatically to Quant and Veridia too via the shared
+pinnacle_product/caddy roles, but neither has been redeployed with
+these fixes yet -- only verified for Sentinel specifically. The
+cross-product container rename (app/veridia-app/sentinel-app ->
+pinnacle-quant/veridia/sentinel, already in TODO.md) remains separate,
+deliberately not folded into this same change.

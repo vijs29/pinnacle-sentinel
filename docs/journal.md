@@ -969,3 +969,42 @@ assumptions:
 
 **Fixed**: Dockerfile CMD and EXPOSE both now say 8010, matching
 docker-compose.prod.yml. Not yet rebuilt/deployed as of this writing.
+
+
+## 2026-07-30 (cont'd) -- First real production deploy: 7 bugs found, Sentinel genuinely live
+
+The long remaining thread from earlier today (port standardization
+request from a Quant-side Claude session) turned into discovering that
+pinnacle-infra's Ansible automation had NEVER been run for real before,
+for any product. Running it for real surfaced 7 genuinely distinct,
+real bugs in sequence -- git auth, Veridia's compose file, host-vs-
+container health-check networking (plus a check_mode gap that hid it
+from every dry run all day), a SECRET_KEY/JWT_SECRET naming mismatch,
+a stale vault Postgres password (fixed via a careful no-plaintext-
+exposure script), a build:policy setting silently reusing a 2-day-old
+Docker image on every deploy, and Caddy running 28 hours without
+reloading its own correct config. Full detail in decisions.md D-018.
+
+Along the way: installed ansible-core + ansible-lint directly in
+Claude's own sandbox (Vijay asked whether Claude could be given real
+testing ability; checked the MCP connector registry first -- no
+suitable SSH/remote-exec connector exists there, so local static
+analysis was the real, available option) -- used for real on the
+health-check and caddy role fixes, catching genuine issues
+(no-changed-when, FQCN naming) before they shipped.
+
+Also: a GitHub PAT got accidentally exposed in chat mid-session when
+`ansible-vault edit` silently failed to open an editor ($EDITOR was
+unset) -- revoked and regenerated immediately, $EDITOR=nano set to
+prevent recurrence. Documented honestly per the adversarial-honesty
+principle rather than glossed over.
+
+**Final state, verified directly**: sentinel.pinnacletranscore.com
+returns 200, /api/health returns healthy. Since this deploy included
+build:always's fix (a genuine full rebuild), today's earlier
+Methodology/NavBar/Infrastructure UI work is now ACTUALLY live for the
+first time -- it had been committed but never really deployed all day
+due to bug #6.
+
+Session paused here for a break, per Vijay's request, after a very
+long and genuinely productive stretch.
