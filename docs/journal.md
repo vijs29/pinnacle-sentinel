@@ -897,3 +897,44 @@ confirms, then start the shared-content-via-Ansible architecture
 (FOUNDER_OPERATING_MANUAL.md, PLATFORM_INTEGRATION.md, Infrastructure
 page content templated from pinnacle-infra) -- confirmed direction,
 not yet built, per Vijay's explicit sequencing.
+
+
+## 2026-07-30 (cont'd) -- Real finding: pinnacle-infra had never been committed to git
+
+While committing the new consolidated pinnacle_product role, discovered
+pinnacle-infra had only ONE prior commit ("Initial scaffold"), which
+contained just ansible.cfg/vars.yml/inventory/requirements.yml/the
+common role -- NOT the actual working roles, playbooks, or the
+encrypted vault with every production secret. This real, actively-used
+deployment automation existed only on Vijay's local Mac, with zero
+backup, since the project began.
+
+.gitignore was correctly configured throughout (.vault_pass excluded,
+vault.yml correctly included since it's encrypted) -- this was a real
+gap in what got committed, not a security mistake.
+
+Fixed: deleted the three old, now-superseded per-product role
+directories first (so the repo's real first substantive commit
+reflects the clean consolidated architecture, not dead code), then
+committed everything else in one commit -- playbooks, postgres role,
+the new pinnacle_product role, encrypted vault.yml. Pushed to
+github.com/vijs29/pinnacle-infra. Full detail in decisions.md (D-017
+continued).
+
+Confirmed strategy.md does NOT need updating for this -- it's Sentinel's
+product thesis document (the red-flag detection concept, the moat,
+proof methodology), and today's work was purely deployment
+infrastructure, unrelated to what Sentinel is or why it can win.
+
+Still open: whether pinnacle-infra should get its own docs/ folder
+(decisions.md, journal.md) rather than having its cross-product changes
+tracked inside Sentinel's docs by convention. Not decided.
+
+**Where things stand at end of session**: consolidated Ansible role
+verified via dry run for all three products (quant, veridia, sentinel),
+NOT yet run for real against production. Insider-selling Form 4
+ingestion still running in Vijay's dedicated terminal (285K-filing
+backfill, cluster-detection logic itself not yet built). Shared-content-
+via-Ansible architecture (FOUNDER_OPERATING_MANUAL.md,
+PLATFORM_INTEGRATION.md, Infrastructure page content) confirmed as
+direction, not yet built.
