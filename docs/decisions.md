@@ -584,3 +584,45 @@ generation, git pull, container deploy, health check all present), not
 silently skipped. NOT yet run for real against production -- dry-run
 verification only as of this writing; a real run is the natural next
 step once Vijay confirms readiness.
+
+
+## D-017 (continued) -- Real finding: production Ansible automation had never been committed to git (2026-07-30)
+
+While preparing to commit the consolidated pinnacle_product role,
+`git status` in pinnacle-infra revealed only ONE prior commit existed
+("Initial scaffold," 2026-07-29) -- and it contained only .gitignore,
+ansible.cfg, vars.yml, inventory/production.yml, requirements.yml, and
+the common role. Confirmed via `git show --stat HEAD`.
+
+Everything else -- the three original per-product roles' actual
+tasks/handlers/templates, the postgres role, ALL THREE playbooks
+(deploy.yml, setup.yml, rollback.yml), and group_vars/all/vault.yml
+(every production secret: postgres password, veridia_ro/sentinel_ro
+passwords, Pushover keys, Alpaca API keys, JWT secret, and today's new
+GitHub token) -- had never been committed. This real, working,
+actively-deploying production automation existed ONLY on Vijay's local
+Mac disk, with zero backup, for the life of the project until this
+session.
+
+Confirmed .gitignore was correctly configured throughout (.vault_pass
+-- the actual decryption password -- properly excluded; vault.yml
+correctly NOT excluded, since it's encrypted and meant to be committed
+per its own header comment) -- so this was a real gap in what got
+committed, not a security misconfiguration.
+
+**Fixed**: deleted the three old, now-superseded per-product role
+directories (replaced by the consolidated pinnacle_product role, see
+above) before this repo's first substantive commit, so the initial
+real commit reflects the clean, current architecture rather than
+carrying dead code forward. Committed everything else -- playbooks,
+postgres role, pinnacle_product role, encrypted vault.yml -- in one
+commit, pushed to github.com/vijs29/pinnacle-infra. This deployment
+automation now has a real backup for the first time.
+
+**Not yet done**: pinnacle-infra has no docs/ folder of its own
+(decisions.md, journal.md, strategy.md) -- this whole D-017 arc has
+been documented in SENTINEL's docs instead, since the investigation
+started there, even though the actual changes are cross-product
+infrastructure work. Worth deciding whether pinnacle-infra needs its
+own documentation set, rather than continuing to track its own
+decisions inside one product's docs by convention.
