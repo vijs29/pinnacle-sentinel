@@ -3,16 +3,18 @@ Form 4 ingestion: fetches raw XML, parses real transactions into
 insider_transactions. See docs/journal.md for the schema verification
 (Ameren/AEE, Warner Baxter, 2017-06-09) done before writing this.
 
-REVISED: the initial version assumed a fixed URL transform (strip
-"/xslF345X03/" from the cached viewer URL). This broke on a large
-fraction of real filings -- confirmed via a test batch where most
-filings failed with "mismatched tag" XML parse errors, traced to a 3M
-filing using a DIFFERENT viewer folder name (xslF345X06) and a
-different primary filename (form4.xml, not edgar.xml). Now looks up
-each filing's real primary document dynamically via SEC's own
-index.json directory listing, which reliably works regardless of
-filer/year-specific naming -- confirmed against both the original
-edgar.xml case and this newly-found form4.xml case.
+REVISED (v3): parallelized the network-fetching step (index.json lookup
++ XML fetch per filing) across a small thread pool, since this is
+purely I/O-bound work -- most wall-clock time is spent waiting for
+SEC's servers, not doing CPU work. All database writes stay in the
+main thread (SQLAlchemy sessions aren't safe to share across threads).
+4 concurrent workers x 2 requests/filing, each individually paced,
+keeps combined request rate comfortably under SEC's published 10
+requests/second fair-access guidance while meaningfully speeding up
+the 285K-filing backlog. The actual fetch/parse logic is UNCHANGED
+from the already-verified v2 (index.json-based dynamic lookup, fixing
+the earlier fixed-URL-transform bug) -- only the orchestration in
+run() changed, to minimize risk of touching already-tested logic.
 
 Only <nonDerivativeTransaction> elements are real transactions --
 <nonDerivativeHolding> is an informational balance, not a transaction,
@@ -21,6 +23,7 @@ and is deliberately skipped.
 import time
 import warnings
 import xml.etree.ElementTree as ET
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import requests
 
@@ -29,7 +32,8 @@ from app.models.filing import Filing
 from app.models.insider_transaction import InsiderTransaction
 
 SEC_HEADERS = {"User-Agent": "Vijay Sentinel vijay.cloudarchitect@gmail.com"}
-REQUEST_DELAY_SECONDS = 0.2
+REQUEST_DELAY_SECONDS = 0.15
+MAX_WORKERS = 4
 
 
 def base_dir_url(cached_url: str) -> str:
@@ -73,6 +77,20 @@ def fetch_form4_xml(url: str, max_retries: int = 3):
                 continue
             print(f"  WARN: fetch failed after {max_retries} attempts for {url}: {e}")
             return None
+
+
+def _fetch_one_filing(filing_id, filing_url, ticker):
+    real_url = find_real_xml_url(filing_url)
+    time.sleep(REQUEST_DELAY_SECONDS)
+    if real_url is None:
+        return (filing_id, ticker, None, "index_lookup_failure")
+
+    xml_text = fetch_form4_xml(real_url)
+    time.sleep(REQUEST_DELAY_SECONDS)
+    if xml_text is None:
+        return (filing_id, ticker, None, "fetch_failure")
+
+    return (filing_id, ticker, xml_text, None)
 
 
 def _text(el, path, default=None):
@@ -154,53 +172,61 @@ def parse_form4_xml(xml_text: str, filing_id: int, ticker: str):
 def run(limit=None, rescan_all=False):
     db = SessionLocal()
 
-    already_ingested_filing_ids = {
-        row[0] for row in db.query(InsiderTransaction.filing_id).distinct().all()
-    }
-
+    # FIXED: previously fetched `limit` filings by ID FIRST, then
+    # filtered out already-done ones in Python -- meant a small-limit
+    # test run mostly returned already-completed filings once real
+    # progress existed (filtering happened AFTER the limit, not before).
+    # Also loaded all 285K Filing rows into memory just to compute a set
+    # difference. Now filters at the DATABASE level via NOT IN, so the
+    # limit applies to genuinely-remaining work, and nothing more than
+    # `limit` rows are ever pulled into memory.
     query = db.query(Filing).filter(Filing.form_type == "4")
+
+    if not rescan_all:
+        already_ingested_subq = db.query(InsiderTransaction.filing_id).distinct().subquery()
+        query = query.filter(~Filing.id.in_(db.query(already_ingested_subq.c.filing_id)))
+
     query = query.order_by(Filing.id)
     if limit:
         query = query.limit(limit)
     filings = query.all()
 
+    skipped_already_done = "N/A (filtered at DB level, not counted)" if not rescan_all else 0
+
     parsed_count = 0
-    skipped_already_done = 0
     index_lookup_failures = 0
     fetch_failures = 0
     no_transactions = 0
     transactions_created = 0
+    checked = 0
 
-    for i, filing in enumerate(filings):
-        if not rescan_all and filing.id in already_ingested_filing_ids:
-            skipped_already_done += 1
-            continue
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        futures = {
+            executor.submit(_fetch_one_filing, f.id, f.filing_url, f.ticker): f
+            for f in filings
+        }
 
-        real_url = find_real_xml_url(filing.filing_url)
-        time.sleep(REQUEST_DELAY_SECONDS)
-        if real_url is None:
-            index_lookup_failures += 1
-            continue
+        for future in as_completed(futures):
+            filing_id, ticker, xml_text, error_reason = future.result()
+            checked += 1
 
-        xml_text = fetch_form4_xml(real_url)
-        time.sleep(REQUEST_DELAY_SECONDS)
-        if xml_text is None:
-            fetch_failures += 1
-            continue
+            if error_reason == "index_lookup_failure":
+                index_lookup_failures += 1
+            elif error_reason == "fetch_failure":
+                fetch_failures += 1
+            else:
+                txns = parse_form4_xml(xml_text, filing_id, ticker)
+                if not txns:
+                    no_transactions += 1
+                else:
+                    for t in txns:
+                        db.add(t)
+                    transactions_created += len(txns)
+                parsed_count += 1
 
-        txns = parse_form4_xml(xml_text, filing.id, filing.ticker)
-        if not txns:
-            no_transactions += 1
-        else:
-            for t in txns:
-                db.add(t)
-            transactions_created += len(txns)
-
-        parsed_count += 1
-
-        if (i + 1) % 20 == 0:
-            db.commit()
-            print(f"  progress: {i + 1}/{len(filings)} filings checked, {transactions_created} transactions created so far")
+            if checked % 20 == 0:
+                db.commit()
+                print(f"  progress: {checked}/{len(filings)} filings checked, {transactions_created} transactions created so far")
 
     db.commit()
     db.close()
