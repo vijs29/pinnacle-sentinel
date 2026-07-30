@@ -728,3 +728,34 @@ these fixes yet -- only verified for Sentinel specifically. The
 cross-product container rename (app/veridia-app/sentinel-app ->
 pinnacle-quant/veridia/sentinel, already in TODO.md) remains separate,
 deliberately not folded into this same change.
+
+
+## D-018 (continued) -- Quant's .env deletion risk fixed and verified safe (2026-07-30)
+
+Followed the exact plan from the earlier TODO.md entry. Fetched all 15
+real secret values from Quant's live .env via a purpose-built,
+no-plaintext-exposure script (same pattern as the Postgres password
+fix -- values piped directly from an ansible ad-hoc fetch into a
+script that only ever prints SHA-256 hash prefixes), added each to
+vault.yml as vault_quant_<key>, verified all 15 landed correctly via
+hash comparison. Then rewrote quant.env.j2 to reference all 15 vault
+entries plus DOMAIN (not treated as a secret -- already a known,
+non-sensitive Ansible variable).
+
+**Safety-verified before any real deploy**: re-ran the --check --diff
+dry run and checked the names-only redacted diff. Confirmed EVERY
+removed line has a matching added line with the identical variable
+name -- zero unexplained deletions. The 7 most sensitive variables
+(ANTHROPIC_API_KEY, SECRET_KEY, all 4 Alpaca keys) showed no diff at
+all, meaning the freshly-vaulted value is byte-identical to what's
+already live -- the safest possible outcome. DATABASE_URL and
+JWT_SECRET appeared as pure additions, not overwrites.
+
+This closes the real, severe risk found earlier (a real deploy would
+have deleted 16 live variables with no replacement, breaking Quant's
+LLM access, auth, and all trading functionality). Real deploy for
+Quant is next, now backed by actual verification rather than
+assumption -- including correcting course after "Quant Claude" (a
+separate Claude session on the Quant side) reported Quant as "ready to
+deploy" without this verification having actually been confirmed at
+that point in this conversation.
