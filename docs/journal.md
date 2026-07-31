@@ -1008,3 +1008,49 @@ due to bug #6.
 
 Session paused here for a break, per Vijay's request, after a very
 long and genuinely productive stretch.
+
+
+## 2026-07-30 (cont'd) -- Production Caddy incident: all 4 domains down, all 4 restored
+
+After confirming and applying Quant's .env-deletion fix (D-018), Quant
+Claude prepared to run its real deploy. Before that happened, our own
+work adding QuantInfra AI/Biosignal placeholders and restoring RAQA's
+Caddy block surfaced a real, active production incident: all four live
+domains (quant, veridia, sentinel, raqa) went down simultaneously.
+
+Traced to 4 distinct root causes (full detail in decisions.md D-018):
+1. RAQA's Caddy block silently dropped the first time the new caddy
+   role ran (RAQA isn't in vars.yml's products list) -- fixed by
+   hardcoding RAQA's block in the template.
+2. Quant's own git repo had a competing, committed Caddyfile
+   (historical, from before multi-product support) that kept
+   overwriting the shared Caddyfile on every Quant deploy -- this is
+   what took down ALL FOUR domains, not just RAQA. Fixed
+   collaboratively with Quant's Claude session: removed from Quant's
+   git tracking, added to .gitignore there.
+3. A separate, pre-existing latent bug: a stale ACME lock file for the
+   bare apex domain, causing an endless certificate-retry loop that
+   had likely been running in the background before today, unrelated
+   to our changes -- removed.
+4. RAQA's real static files (confirmed: genuinely committed and pushed
+   to GitHub, not just tested locally as first suspected) were never
+   mounted into the Caddy container's filesystem -- added the missing
+   volume mount to Quant's docker-compose.prod.yml, re-cloned RAQA's
+   repo onto the host, recreated the caddy container.
+
+Explicitly asked Quant's Claude session to pause its own deploy while
+this was active, to avoid a race condition re-triggering root cause 2
+mid-fix -- coordination worked as intended.
+
+**Final state, verified via curl AND manual browser check**: all four
+domains return 200 -- quant, veridia, sentinel, raqa.
+
+Surfaced a real, not-yet-fixed architectural issue: Caddy's container
+definition still lives inside Quant's own compose file, not
+pinnacle-infra, despite serving all three products plus RAQA. Tracked
+in TODO.md as a deliberate follow-up, not rushed into tonight.
+
+Also added QuantInfra AI and Biosignal as placeholder products (
+caddy_enabled: false, so no Caddy block/cert-retry risk until each is
+actually deployed) -- the intended mechanism for future products
+without ever touching the Caddyfile template again.
