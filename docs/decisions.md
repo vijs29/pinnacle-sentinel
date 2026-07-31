@@ -759,3 +759,82 @@ assumption -- including correcting course after "Quant Claude" (a
 separate Claude session on the Quant side) reported Quant as "ready to
 deploy" without this verification having actually been confirmed at
 that point in this conversation.
+
+
+## D-018 (continued) -- Full production Caddy incident: 4 real root causes found and fixed (2026-07-30)
+
+What started as "RAQA's SSL broke" turned into a multi-hour incident
+touching all four live domains (quant, veridia, sentinel, raqa)
+simultaneously. Documenting the full chain honestly, since this was a
+real production outage, not a minor bug.
+
+**Root cause 1 -- RAQA's Caddy block silently dropped.** The new
+`caddy` role (built earlier today) fully regenerates the Caddyfile
+from vars.yml's products list. RAQA is a static site, not one of the
+three containerized products, so it was never in that list -- meaning
+the FIRST time the caddy role ran, it silently deleted RAQA's block
+even though RAQA's own valid, real Let's Encrypt certificate (verified
+against the real production CA, not staging -- confirming RAQA really
+was live before) remained in Caddy's storage, now orphaned. Fixed:
+added RAQA's block back explicitly in Caddyfile.j2 (hardcoded, since
+it doesn't fit the products-loop pattern).
+
+**Root cause 2 -- Quant's own git repo had a competing, committed
+Caddyfile.** Confirmed via `git log -- Caddyfile` in Quant's repo
+(commit c6807bc, "HTTPS: Caddy + Let's Encrypt", from when Quant was
+the only product). Because Quant's repo checks out directly into
+`/home/ubuntu/pinnacle` -- the SAME path our caddy role writes to --
+every Quant deploy's `git pull` overwrote our multi-product Caddyfile
+with Quant's old, single-domain version. This is what caused ALL FOUR
+domains to go down simultaneously, not just RAQA. Fixed collaboratively
+with Quant's own Claude session: removed Caddyfile from Quant's git
+tracking (their commit 9b4646d) and added to .gitignore there.
+
+**Root cause 3 -- a genuinely separate, pre-existing latent bug,
+unrelated to today's work.** Caddy's own certificate-storage subsystem
+had a stale lock file (`/data/caddy/locks/issue_cert_pinnacletranscore.com.lock`)
+for the bare apex domain (`pinnacletranscore.com`, no subdomain) --
+likely from an old, abandoned experiment, with NO real certificate
+directory ever created for it (confirmed: only quant/veridia/sentinel/
+raqa have real cert directories). This caused an endless ACME retry
+loop (growing backoff, up to 20 minutes between attempts) that had
+apparently been running in the background for some unknown period
+before today, consuming resources and adding noise to every log check
+during this investigation. Fixed: removed the stale lock file.
+
+**Root cause 4 -- RAQA's static files were never mounted into the
+Caddy container.** After root causes 1-2 were fixed and RAQA's
+Caddyfile block was correctly routing again, RAQA still returned 404 --
+the actual HTML files, while genuinely present on the EC2 HOST at
+/srv/raqa (confirmed: real repo, 2 real commits, both pushed to
+GitHub), were never mounted into the Caddy CONTAINER's filesystem.
+`docker inspect`'s mount list confirmed only 3 mounts existed
+(Caddyfile, caddy_data, caddy_config) -- no /srv/raqa mount at all.
+Fixed: added `/srv/raqa:/srv/raqa:ro` to Caddy's service definition in
+Quant's docker-compose.prod.yml (a live, direct edit for immediate
+recovery), then re-cloned RAQA's real repo onto the host (git clone,
+requiring a `mkdir -p` + `chown` first, since /srv/ needs root/become
+to write to), then recreated just the caddy container
+(`docker compose up -d caddy`) to pick up the new mount.
+
+**Final verified state**: all four domains return 200, confirmed via
+both direct curl AND manual browser check -- quant.pinnacletranscore.com,
+veridia.pinnacletranscore.com, sentinel.pinnacletranscore.com,
+raqa.pinnacletranscore.com.
+
+**Real architectural inconsistency surfaced, not yet fixed**: Caddy's
+CONFIG (the Caddyfile itself) is now correctly infra-managed via the
+caddy role, but Caddy's CONTAINER DEFINITION (the actual docker-compose
+service block -- image, ports, volumes) still physically lives inside
+Quant's own docker-compose.prod.yml, coupling Caddy's lifecycle to
+Quant's deploys even though Caddy now serves all three products plus
+RAQA. Proper fix (tracked, not yet done): extract Caddy into its own
+compose file living in pinnacle-infra, deployed independently. Requires
+coordination with Quant's own Claude session, same as today's Caddyfile
+git-conflict fix -- deliberately not rushed into on top of an already
+long incident.
+
+**Process note**: explicitly asked Quant's Claude session to hold off
+on its own real deploy while this incident was active, to avoid a race
+condition where another Quant deploy would re-trigger root cause 2
+mid-fix. Coordination confirmed working as intended.
