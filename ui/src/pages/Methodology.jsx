@@ -138,6 +138,35 @@ export default function Methodology() {
           </div>
         </Section>
 
+        <Section title="Built with real infrastructure discipline">
+          <p style={pText}>
+            All three products deploy through a single, shared automation system
+            (Ansible) rather than manual, one-off server changes. Every deployment
+            follows the same two-step discipline: a dry run first, showing exactly
+            what would change, then the real deploy -- never the reverse.
+          </p>
+          <p style={pText}>
+            One shared deployment role, one shared reverse-proxy configuration, and
+            one shared encrypted secrets store cover all three products, so a fix
+            made once is verified once and applies consistently everywhere, rather
+            than three separate, drifting configurations quietly diverging from
+            each other over time.
+          </p>
+          <div style={{
+            fontSize: 12.5, color: 'var(--text-muted)', lineHeight: 1.6,
+            background: 'rgba(212,68,63,0.06)', border: '1px solid rgba(212,68,63,0.2)',
+            borderRadius: 8, padding: '12px 14px', marginTop: 16,
+          }}>
+            <b style={{ color: 'var(--text-secondary)' }}>What we don't claim:</b> our
+            infrastructure has had real incidents -- including a production outage
+            affecting all three products simultaneously, caused by two automated
+            systems unexpectedly overwriting the same configuration file. We found
+            it, fixed the root cause, and documented it in full rather than quietly
+            patching around it. The same honesty standard that applies to our
+            signals applies to how we run the platform underneath them.
+          </div>
+        </Section>
+
         {/* ============================================================ */}
         {/* PINNACLE SENTINEL divider                                    */}
         {/* ============================================================ */}
