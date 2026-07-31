@@ -77,7 +77,7 @@ const SECTIONS = {
           detail={`Domain: pinnacletranscore.com\nSubdomains: quant.*, veridia.*, sentinel.*`}
           isVijay={isVijay} />
         <ServiceCard icon="🔐" name="AWS IAM"
-          description="Identity and access management. SSH key-only EC2 access -- no password authentication."
+          description="Identity and access management. SSH key-only EC2 access — no password authentication."
           detail={`SSH key: pinnacle-quant-ed25519-20260702\nAuth: Ed25519 key pair only`}
           isVijay={isVijay} />
       </>
@@ -89,7 +89,7 @@ const SECTIONS = {
       <>
         <ServiceCard icon="📦" name="Docker Compose"
           description="Orchestrates all platform containers on a single host. Each product runs in its own container with shared networking."
-          detail={`Network: pinnacle_default (bridge)\nContainers: pinnacle-app-1, pinnacle-veridia-veridia-app-1,\npinnacle-sentinel-app-1, pinnacle-db-1, pinnacle-caddy-1`}
+          detail={`Network: pinnacle_default (bridge)\nContainers: pinnacle-app-1, pinnacle-veridia-veridia-app-1,\npinnacle-sentinel-sentinel-app-1, pinnacle-db-1, pinnacle-caddy-1`}
           isVijay={isVijay} />
         <ServiceCard icon="🔀" name="Caddy"
           description="Reverse proxy and automatic HTTPS. Routes traffic from public subdomains to the correct container. Handles SSL certificate renewal automatically via Let's Encrypt."
@@ -108,17 +108,19 @@ const SECTIONS = {
       <>
         <div style={{
           padding: '12px 16px', borderRadius: 8, marginBottom: 12,
-          background: 'rgba(2,132,199,0.06)', border: '0.5px solid rgba(2,132,199,0.2)',
-          fontSize: 12, color: '#0284c7',
+          background: 'rgba(16,185,129,0.06)', border: '0.5px solid rgba(16,185,129,0.2)',
+          fontSize: 12, color: '#10b981',
         }}>
-          🚧 In progress -- replacing manual deployment with fully automated, auditable playbooks
+          Live since 2026-07-30 — first real run surfaced and fixed 8 real deployment
+          bugs plus a 4-domain production incident, fully documented rather than
+          quietly patched around. See the Founder's Operating Manual, Section 9.
         </div>
         {[
-          { icon: '📋', name: 'Ansible Collections', status: 'planned', description: 'community.docker for container management, community.postgresql for database users and grants, community.crypto for SSL/TLS certificates.' },
-          { icon: '🔒', name: 'Ansible Vault', status: 'planned', description: 'Encrypted secrets management. Replaces manual .env file editing. All credentials stored encrypted in git.' },
-          { icon: '🎭', name: 'Ansible Roles', status: 'planned', description: 'Structured, reusable playbooks per product: pinnacle_quant, pinnacle_veridia, pinnacle_sentinel, postgres_users, caddy, common.' },
-          { icon: '📝', name: 'Jinja2 Templates', status: 'planned', description: 'Generate .env files from vault variables. Eliminates manual environment configuration on the server.' },
-          { icon: '🏷', name: 'Ansible Tags', status: 'planned', description: 'Deploy only what changed: --tags quant deploys Pinnacle Quant only. --tags db_users updates database permissions only.' },
+          { icon: '📋', name: 'Ansible Collections', status: 'live', description: 'community.docker for container management, community.postgresql for database users and grants.' },
+          { icon: '🔒', name: 'Ansible Vault', status: 'live', description: 'Encrypted secrets for all three products. Replaced manual .env file editing. A real dry-run diff caught 15 missing production secrets in Quant\'s template before they could be silently deleted.' },
+          { icon: '🎭', name: 'Ansible Roles', status: 'live', description: 'One consolidated pinnacle_product role parameterized per product (not three separate near-duplicate roles), plus caddy, postgres, and common. Adding a future product needs a data entry, not a new role.' },
+          { icon: '📝', name: 'Jinja2 Templates', status: 'live', description: 'Generate .env files from vault variables, and the shared Caddy reverse-proxy config from the same product list. Eliminates manual environment configuration on the server.' },
+          { icon: '🏷', name: 'Ansible Tags', status: 'live', description: 'Deploy only what changed: --tags quant deploys Pinnacle Quant only. --tags db_users updates database permissions only.' },
           { icon: '🧪', name: 'Molecule Testing', status: 'planned', description: 'Test-driven infrastructure. Roles tested in isolation using Docker before being applied to production.' },
         ].map(({ icon, name, description, status }) => (
           <div key={name} style={{
@@ -203,6 +205,7 @@ export default function Infrastructure() {
       .catch(() => {})
   }, [])
 
+  // Which sections to show
   const sectionsToShow = activeSection
     ? (SECTIONS[activeSection] ? [activeSection] : Object.keys(SECTIONS))
     : Object.keys(SECTIONS)
@@ -212,6 +215,7 @@ export default function Infrastructure() {
       <NavBar />
       <div style={{ maxWidth: 900, margin: '0 auto', padding: '32px 20px' }}>
 
+        {/* Header */}
         <div style={{ marginBottom: 32 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
             <div style={{
@@ -244,11 +248,12 @@ export default function Infrastructure() {
               background: 'rgba(212,175,55,0.08)', border: '0.5px solid rgba(212,175,55,0.2)',
               fontSize: 11, color: 'var(--gold-400)', display: 'inline-block',
             }}>
-              🔑 Admin view -- infrastructure details visible
+              🔑 Admin view — infrastructure details visible
             </div>
           )}
         </div>
 
+        {/* Sections */}
         {sectionsToShow.map(key => {
           const section = SECTIONS[key]
           if (!section) return null
