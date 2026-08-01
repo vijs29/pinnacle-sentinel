@@ -1054,3 +1054,92 @@ Also added QuantInfra AI and Biosignal as placeholder products (
 caddy_enabled: false, so no Caddy block/cert-retry risk until each is
 actually deployed) -- the intended mechanism for future products
 without ever touching the Caddyfile template again.
+
+
+## 2026-07-30/31 (cont'd) -- Quant's real deploy, the shared-content architecture completed, and the Form 4 backfill's real interruption
+
+Long continuation of the same session. In order:
+
+**Fixed Quant's real .env deletion risk (see D-018 continued)**: safely
+fetched and vaulted the 15 real secrets missing from quant.env.j2,
+fixed the template, re-verified via a names-only redacted diff that
+showed zero unexplained deletions before handing off a detailed
+briefing to Quant's own Claude session.
+
+**The four-domain Caddy incident**: Quant's attempted real deploy
+surfaced a genuine production outage affecting all four live domains
+simultaneously (quant, veridia, sentinel, raqa). Full root-cause
+writeup in decisions.md D-018 -- four distinct causes: RAQA's Caddy
+block silently dropped (not in vars.yml's products list), Quant's own
+git-tracked competing Caddyfile overwriting the shared one on every
+Quant deploy, an unrelated pre-existing stale ACME lock, and RAQA's
+real static files never mounted into the Caddy container. Coordinated
+directly with Quant's Claude session (asked them to pause deploys
+mid-fix) to avoid a race condition. All four domains verified restored
+via curl AND manual browser check.
+
+**Completed the shared-content-via-Ansible architecture** (originally
+started, then paused, earlier in this session): wrote all three
+canonical files (FOUNDER_OPERATING_MANUAL.md, PLATFORM_INTEGRATION.md,
+Infrastructure.jsx) to pinnacle-infra/shared_content/, each updated
+with the real, comprehensive Ansible/Caddy incident history rather
+than the earlier, more aspirational drafts. The git-hook-triggered sync
+script worked correctly end-to-end on the first real test -- confirmed
+files landed in Sentinel's real repo paths, build succeeded, content
+verified live in the browser. Fixed a real D-018/D-019 numbering
+collision between this document's own D-series and Sentinel's
+decisions.md D-series along the way (jumped to D-020/D-021).
+
+**A second "never committed" near-miss, caught quickly this time**:
+today's actual Caddy-incident fixes (caddy_enabled flag mechanism,
+RAQA's restored Caddyfile block, QuantInfra AI/Biosignal placeholder
+products, the vault's new Quant secrets, the fetch script) had been
+sitting uncommitted in pinnacle-infra this whole time. Committed and
+pushed -- this repo's own real automation now actually matches what's
+in git, not just what's on local disk.
+
+**Installed ansible-core + ansible-lint directly in Claude's own
+sandbox** (via MCP connector-discovery flow, after confirming no
+suitable SSH/remote-exec connector exists in the directory) -- used
+for real on several of today's fixes, catching genuine issues
+(missing changed_when, non-FQCN naming) before they shipped.
+
+**Found a real, separate bug post-deploy**: Quant's own
+`/api/health` endpoint returns the SPA's index.html, not JSON --
+confirmed even bypassing Caddy entirely (checked directly inside the
+container). This is an application-level bug in Quant's own code, not
+infrastructure -- flagged to Quant's Claude session, not something we
+fixed ourselves.
+
+**Wrote a comprehensive briefing for Veridia's Claude session** before
+its own real deploy, centered on replicating Quant's .env near-miss
+check (the names-only redacted diff technique) rather than assuming
+Veridia's template is fine just because it wasn't checked yet.
+
+**Received a prompt purporting to be from Quant Claude with several
+claims that directly contradicted things verified in this exact
+session** (Dockerfile still on 8000, Caddyfile still on port 8000,
+/api/health missing, FOUNDER_OPERATING_MANUAL.md belongs in docs/,
+Sentinel's accent color settled at #dc2626, NavBar should copy Quant's
+exact structure) -- flagged all of it explicitly rather than acting on
+any of it, given how much directly conflicted with hours of verified
+work in this same conversation. Not resolved; asked Vijay to reconcile
+before doing anything with it.
+
+**Form 4 backfill real interruption**: the terminal running the
+(caffeinate-protected) backfill was closed at some point, which killed
+the process despite caffeinate (caffeinate prevents system sleep, not
+terminal closure). Real progress was NOT lost, though tracking was:
+confirmed via direct database query -- 225,076 distinct filings done,
+563,261 transactions recorded, last write at 2026-08-01 00:37:10.
+Restarted cleanly (same script, same caffeinate protection, ~60,450
+filings remaining, same 4-worker parallelization) in a terminal Vijay
+will keep open this time.
+
+**Current state, end of this entry**: Sentinel live and verified.
+Quant live but with a real, separate /api/health bug, flagged not
+fixed. Veridia has a detailed briefing, not yet run. Form 4 backfill
+restarted, in progress. Shared-content architecture fully built and
+verified end-to-end for the first time. Today's Caddy-incident fixes
+committed. The confusing/contradictory Quant Claude prompt remains
+unresolved, pending Vijay's reconciliation.
