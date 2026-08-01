@@ -880,3 +880,36 @@ creation at the SOURCE (understand why the parser was creating
 sequential-ID duplicate rows for some filings in the first place --
 observed as adjacent database IDs from the same parsing pass, not
 re-run artifacts) rather than relying on DB-level cleanup at all.
+
+
+## D-020 -- No manual deploys, ever: everything goes through Ansible only (2026-08-01)
+
+**Decision**: no more manual/direct production changes of any kind --
+no direct SSH edits, no direct docker commands, no manual file edits
+on the server. Every change to production, without exception,
+including active incident response, goes through a written and run
+Ansible task.
+
+**No emergency exception.** Explicitly considered and rejected: during
+today's four-domain Caddy incident (D-018) and the RAQA volume-mount
+fix, several direct, non-Ansible actions were taken to restore service
+quickly -- a live edit to docker-compose.prod.yml, a direct `docker
+restart`, a direct `git clone` for RAQA's files. Effective
+immediately, this is no longer acceptable practice, even under
+incident pressure. Emergencies are fixed by writing the Ansible task
+(or ad-hoc command, which is already how we do investigation/diagnosis
+-- this policy is specifically about CHANGES, not read-only diagnostic
+commands) and running it, accepting that this takes longer than a
+direct edit would.
+
+**Rationale**: direct edits are exactly how today's real incidents
+compounded -- untracked, undocumented, easy to forget, and prone to
+being silently overwritten by the next real deploy (as literally
+happened with the Caddyfile itself). Every change through Ansible
+means every change is inherently logged, repeatable, and re-appliable
+after any future redeploy.
+
+**What this does NOT restrict**: read-only diagnostic commands (via
+ansible ad-hoc `-m command`/`-m shell`, checking logs/files/status)
+remain the correct, encouraged way to investigate -- this policy is
+about anything that CHANGES production state.
