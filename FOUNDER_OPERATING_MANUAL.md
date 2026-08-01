@@ -88,6 +88,17 @@ Format: `D-XXX | Date | One-line description | Evidence | Decision`. Real produc
 2. **Never edit files manually.** All changes via scripting.
 3. **`py_compile` before every deploy.**
 4. **`npm run build` before every frontend commit.**
+5. **Before changing a shared resource or file, check first whether the
+   content/change already exists there.** Decided 2026-08-01, after
+   several real mistakes this same day were traceable to skipping this:
+   D-series numbering collisions between this document's own D-series
+   and each product's decisions.md (same "D-XXX" format used for two
+   different things, confirmed colliding at least once), and a section
+   nearly getting duplicated in Infrastructure.jsx. Applies to shared
+   docs (this Manual, PLATFORM_INTEGRATION.md), shared config
+   (vars.yml, vault.yml), and shared code (any role/template used by
+   more than one product) -- grep or view the current state before
+   adding anything, every time, not just when something feels risky.
 
 ### Never do these things
 - Never push to production without running verify_deploy
@@ -97,6 +108,7 @@ Format: `D-XXX | Date | One-line description | Evidence | Decision`. Real produc
 - Never promote a signal to LIVE without completing all six gauntlet stages
 - Never claim an edge without showing the statistical evidence
 - **Never trust that a "successful" deploy actually changed anything real** — verify the live endpoint directly, every time, not just the deploy tool's own exit code (see Section 9)
+- **Never make a manual/direct production change of any kind — no exceptions, including active incidents.** No direct SSH edits, no direct docker commands, no manual server file edits. Every change goes through a written and run Ansible task, always — even under incident pressure. Decided 2026-08-01 (D-020) after several direct emergency fixes during a real incident (D-018) proved exactly why: untracked, easy to forget, and prone to being silently overwritten by the next real deploy. Read-only diagnostic commands (checking logs/files/status via ansible ad-hoc) remain fine — this is about anything that changes state.
 
 ---
 
