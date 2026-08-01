@@ -9,6 +9,27 @@ validated per FOUNDER_OPERATING_MANUAL.md's own standard.
 
 ## 🔴 TOP PRIORITY -- gate flag visibility, decided 2026-07-30
 
+### Also urgent (2026-08-01)
+- [ ] **Diagnose the actual parser bug** behind the D-019 duplicate
+      issue -- sequential-ID duplicate rows appeared for some filings
+      from a SINGLE parsing pass (not a re-run artifact). Root cause
+      not yet found.
+- [ ] **Run form4_ingest.py once more** after the current job finishes
+      -- will naturally pick up the 9,461 gift-affected filings
+      cleared in D-019, plus anything else still remaining
+- [ ] **Reconcile the contradictory "Quant Claude" prompt** received
+      2026-08-01 (claimed Dockerfile still on 8000, Caddyfile still on
+      8000, /api/health missing, FOUNDER_OPERATING_MANUAL.md belongs
+      in docs/, accent color settled, NavBar should copy Quant exactly
+      -- all contradicted by verified work in this session). Not
+      acted on. Needs Vijay's reconciliation before anything in it is
+      trusted.
+- [ ] **Veridia's real deploy** -- detailed briefing given (mirroring
+      Quant's .env near-miss check), not yet run
+- [ ] **Quant's /api/health bug** -- returns SPA HTML not JSON, even
+      bypassing Caddy. Confirmed application-level, not infra. Flagged
+      to Quant's own Claude session, not fixed here.
+
 **Decision (Vijay)**: since none of Sentinel's 12 flags have passed the
 Six-Stage Signal Gauntlet (see below), real flag data should NOT be
 publicly visible right now. Chosen approach: gate it behind Vijay's own

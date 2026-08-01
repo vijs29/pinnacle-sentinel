@@ -838,3 +838,45 @@ long incident.
 on its own real deploy while this incident was active, to avoid a race
 condition where another Quant deploy would re-trigger root cause 2
 mid-fix. Coordination confirmed working as intended.
+
+
+## D-019 -- Duplicate-cleanup mistake: deleted legitimate paired transactions, fixed (2026-08-01)
+
+While investigating a real duplicate-row issue in insider_transactions
+(found via cleanup queries during the Form 4 backfill), ran three
+DELETE passes using a natural key (filing_id, insider_cik,
+transaction_date, shares, price_per_share, transaction_code) that
+turned out to be INCOMPLETE. Confirmed via a real filing (Garmin/GRMN,
+Jonathan Burrell, CIK 1121788) that SEC Form 4s can legitimately
+contain multiple distinct real transactions sharing all of those
+fields -- e.g. a 100,000-share gift disposed FROM one trust and the
+same-sized gift acquired INTO a different trust, same date/price/code,
+correctly reported as two separate rows. The natural key was missing
+acquired_disposed_code (A/D), so these were wrongly treated as
+duplicates and one of each pair was deleted -- ~44,000 rows removed
+across three passes, some real number of which were legitimate data,
+not artifacts.
+
+No log was kept of which specific filing_ids were affected before
+deleting -- a real process gap. Remediation: identified all filing_ids
+with any transaction_code='G' (gift) row (9,461 filings) as the
+affected population, since that's the pattern where this failure mode
+occurs. Deleted ALL rows for those filing_ids (25,501 rows) so they
+have zero rows and will be naturally picked up and correctly
+re-parsed, from real SEC XML, by the next ingestion run -- no special
+targeting logic needed, just the existing "not yet done" check.
+
+**Not fully resolved**: this remediation assumes gift transactions
+(code G) are the only pattern prone to this failure mode. Other
+transaction codes could theoretically have the same issue if two
+distinct real transactions share every field in the (incomplete)
+natural key. Not verified beyond the G-code population.
+
+**Real fix still needed**: any FUTURE natural-key-based deduplication
+must include acquired_disposed_code at minimum, and ideally
+shares_owned_after (which also differs between legitimate paired
+transactions in the real filing checked). Better: fix duplicate
+creation at the SOURCE (understand why the parser was creating
+sequential-ID duplicate rows for some filings in the first place --
+observed as adjacent database IDs from the same parsing pass, not
+re-run artifacts) rather than relying on DB-level cleanup at all.
