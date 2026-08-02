@@ -940,3 +940,18 @@ is now clean: legitimate distinct transactions (like Garmin's paired
 gift dispositions) are preserved, genuine filer-side duplicates are
 removed. Total current state: 275,389 filings processed, transaction
 count post-cleanup reflects only real, distinct economic events.
+
+
+## D-016 (continued) -- Form 4 historical backfill complete (2026-08-01)
+
+285,108 of 285,526 filings processed (99.85%), 670,741 clean
+transaction rows, 0 duplicates (verified via the corrected natural key
+including acquired_disposed_code -- see D-019). Remaining ~418 filings
+are genuine, permanent non-successes (holding-only filings with no
+real transactions, or persistent lookup failures), not something
+further retries would resolve.
+
+Insider selling cluster detection (the actual flag-creation logic,
+querying this table for multiple distinct insiders selling within 30
+days) is the next real step -- ingestion alone doesn't create
+FlagEvent rows.
