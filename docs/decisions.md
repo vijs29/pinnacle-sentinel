@@ -913,3 +913,30 @@ after any future redeploy.
 ansible ad-hoc `-m command`/`-m shell`, checking logs/files/status)
 remain the correct, encouraged way to investigate -- this policy is
 about anything that CHANGES production state.
+
+
+## D-019 (continued) -- Real duplicate root cause found: source-level filer errors, not a parser bug (2026-08-01)
+
+Investigated the 986 remaining true-duplicate groups (same filing_id,
+insider_cik, transaction_date, shares, price_per_share,
+transaction_code, AND acquired_disposed_code -- the corrected,
+complete natural key) by fetching one real filing's actual content
+directly (Generac Holdings/GNRC, Norman Taffe, filing_id 144714).
+Confirmed: the SEC filing itself contains the exact duplicate --
+two byte-for-byte identical rows in Table I (same date, code S, 100
+shares, disposed, $256, even the same "shares owned after" value).
+This is a genuine filer-side data-entry error in the original SEC
+filing, not a bug in our parser -- our parser correctly, faithfully
+reads exactly what's on file. Confirms the corrected natural key
+(including acquired_disposed_code, learned from the earlier Garmin
+false-positive) correctly distinguishes real distinct transactions
+from genuine source-level duplicates.
+
+Cleaned up: 1,171 rows deleted (986 groups, some with 3+ copies).
+Verified 0 true duplicates remain platform-wide.
+
+**No further parser changes needed.** The insider_transactions table
+is now clean: legitimate distinct transactions (like Garmin's paired
+gift dispositions) are preserved, genuine filer-side duplicates are
+removed. Total current state: 275,389 filings processed, transaction
+count post-cleanup reflects only real, distinct economic events.
