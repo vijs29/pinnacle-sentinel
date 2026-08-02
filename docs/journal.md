@@ -1143,3 +1143,56 @@ restarted, in progress. Shared-content architecture fully built and
 verified end-to-end for the first time. Today's Caddy-incident fixes
 committed. The confusing/contradictory Quant Claude prompt remains
 unresolved, pending Vijay's reconciliation.
+
+
+## 2026-08-01 (cont'd) -- Duplicate-data mistake found and fixed, D-020 policy, sync verification gaps caught
+
+**Real mistake found and fixed (D-019)**: manual duplicate-cleanup
+DELETE queries (run during Form 4 backfill investigation) used an
+incomplete natural key, missing acquired_disposed_code. Confirmed via
+a real filing (Garmin/GRMN, Jonathan Burrell) that SEC Form 4s can
+legitimately report multiple distinct real transactions sharing every
+field in that key -- a gift disposed from one trust and the same gift
+acquired into another, same date/shares/price/code. ~44,000 rows were
+deleted across three cleanup passes; some real number were legitimate
+data, not artifacts. No log was kept of exactly which filing_ids were
+affected -- a real process gap. Remediation: cleared all rows for the
+9,461 filings with any gift-code transaction (25,501 rows), so they'll
+be correctly re-parsed from real SEC XML on the next ingestion run.
+Root cause of the underlying parser bug (sequential-ID duplicates from
+a single parsing pass) not yet diagnosed -- tracked in TODO.md.
+
+**D-020 decided**: no manual/direct production changes of any kind,
+ever, including active incidents -- everything through a written and
+run Ansible task. No emergency exception, explicitly considered and
+rejected. Added to the canonical FOUNDER_OPERATING_MANUAL.md.
+
+**New process rule adopted**: before changing a shared resource or
+file, check first whether the content/change already exists there --
+prompted by real, repeated mistakes today (D-series numbering
+collisions, a near-duplicated section). Applied immediately to itself:
+caught that an earlier "successful" edit to the canonical Founder's
+Manual had never actually been committed (sitting as an uncommitted
+local change), which in turn meant the sync to all three product repos
+never ran for that change either. Fixed by actually committing it,
+then explicitly verifying (grep, not just trusting the sync script's
+own success message) that Sentinel's real file genuinely had the new
+content before considering it done.
+
+**Real finding while verifying the sync**: Quant's own
+FOUNDER_OPERATING_MANUAL.md has moved to docs/ in their repo (not root,
+where our sync writes), and independently contains real, legitimate
+work from Quant's own session today -- a daily health-check email
+(INF-005/006), a session-audit script, and an independently-decided
+"no manual deploys, Ansible only" policy (INF-007) essentially matching
+our own D-020. This partially reconciles the earlier confusing/
+contradictory "Quant Claude" prompt: the claims describing Quant's OWN
+state were genuinely true; the claims ASSUMING Sentinel needed the
+same fixes (port numbers, /api/health) were wrong, since that session
+doesn't have visibility into Sentinel's actual files. Per Vijay's
+explicit instruction, not fixing Quant's or Veridia's own repo
+structure or sync-path mismatch -- their own teams' call.
+
+**Form 4 backfill progress**: 256,391 of 285,526 filings done as of
+this entry (leaves ~29,135 remaining, which includes the 9,461
+gift-affected filings cleared for re-parse). Still running.
