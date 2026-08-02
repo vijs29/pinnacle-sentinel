@@ -1196,3 +1196,29 @@ structure or sync-path mismatch -- their own teams' call.
 **Form 4 backfill progress**: 256,391 of 285,526 filings done as of
 this entry (leaves ~29,135 remaining, which includes the 9,461
 gift-affected filings cleared for re-parse). Still running.
+
+
+## 2026-08-01 (cont'd) -- D-019 root cause found, Form 4 backfill complete
+
+**D-019's real duplicate root cause identified**: investigated the
+remaining true-duplicate groups (using the corrected natural key
+including acquired_disposed_code) by fetching one real filing's actual
+content directly (Generac Holdings/GNRC, Norman Taffe, filing_id
+144714). Confirmed the SEC filing itself contains an exact duplicate
+line -- two byte-for-byte identical rows in Table I, including the
+same "shares owned after" value. A genuine filer-side data-entry error
+in the original SEC filing, not a bug in our parser. Cleaned up 1,171
++ 1,125 rows across two passes (source-level duplicates occurring
+naturally as more filings were processed) using the corrected key.
+Verified 0 duplicates remain platform-wide.
+
+**Form 4 historical backfill complete**: 285,108 of 285,526 filings
+processed (99.85%), 670,741 clean, deduplicated transaction rows.
+Remaining ~418 filings are genuine permanent non-successes
+(holding-only filings, persistent lookup failures) -- not something
+further retries would resolve.
+
+**Next real step**: the actual cluster-detection logic (querying
+insider_transactions for multiple distinct insiders selling within a
+30-day window, creating the accelerated_insider_selling FlagEvent
+rows) -- ingestion alone doesn't create flags. Not yet built.
