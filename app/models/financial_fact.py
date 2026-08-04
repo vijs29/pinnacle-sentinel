@@ -13,7 +13,7 @@ from app.db.base import Base
 
 
 class FinancialFact(Base):
-    __tablename__ = "financial_facts"
+    __tablename__ = "pinnacle_sentinel_financial_facts"
 
     id = Column(Integer, primary_key=True)
     cik = Column(String, nullable=False, index=True)

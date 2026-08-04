@@ -1222,3 +1222,38 @@ further retries would resolve.
 insider_transactions for multiple distinct insiders selling within a
 30-day window, creating the accelerated_insider_selling FlagEvent
 rows) -- ingestion alone doesn't create flags. Not yet built.
+---
+
+## 2026-08-04 — D-020 database consolidation, platform alignment
+
+### D-020 — All models renamed to pinnacle_sentinel_* prefix
+- `filings` → `pinnacle_sentinel_filings`
+- `flag_events` → `pinnacle_sentinel_flag_events`
+- `sentinel_outcomes` → `pinnacle_sentinel_outcomes`
+- `watchlist_items` → `pinnacle_sentinel_watchlist_items`
+- `financial_facts` → `pinnacle_sentinel_financial_facts`
+- `insider_transactions` → `pinnacle_sentinel_insider_transactions`
+- `quant_scores` → `pinnacle_sentinel_quant_scores`
+- `users` → `platform_users` (shared auth table across all products)
+- All FK references updated to use new table names
+- All tables already existed in `pinnacle_platform` DB (migrated by Quant session)
+
+### /api/health updated to platform standard
+- Was: `{"status": "healthy"}`
+- Now: `{"status": "ok", "product": "pinnacle-sentinel"}`
+
+### Platform alignment
+- DATABASE_URL local .env updated to `pinnacle_platform` (was `pinnacle_sentinel`)
+- Python version standardized: 3.14 → 3.12.13 (consistent with Quant and Veridia)
+- .venv renamed: `.venv` → `.venv-sentinel` (consistent naming convention)
+- create_all: added `checkfirst=True` to prevent duplicate index errors
+
+### INF-010 Phase 3 — DB role separation (pending)
+- `pinnacle_sentinel_app` role not yet created
+- Will be done after Sentinel reaches full parity with Quant and Veridia
+
+### Startup script
+- pinnacle-infra `scripts/startup.sh` now includes 3 Sentinel tabs:
+  - `[.venv-sentinel] Sentinel API :8010`
+  - `[Vite] Sentinel UI :5180`
+  - `[.venv-sentinel] Sentinel Commands`

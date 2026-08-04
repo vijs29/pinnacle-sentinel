@@ -138,3 +138,25 @@ footnote/red-flag research tool (deeper detail, raw filing excerpts,
 per-flag drill-down) are genuinely different products built on the same
 underlying data pipeline. Which to build first is not yet decided --
 carried as an open item in decisions.md.
+
+---
+
+## Strategy Review — 2026-08-04
+
+**Status:** Thesis intact. Platform significantly advanced.
+
+**Progress since last review:**
+- D-020 complete for Sentinel: all models use `pinnacle_sentinel_*` prefix
+- Tables already in `pinnacle_platform` DB (migrated by Quant Claude)
+- /api/health platform standard: `{"status":"ok","product":"pinnacle-sentinel"}`
+- Python 3.12.13 standardized across all products
+- Local dev: Sentinel now included in startup.sh (3 tabs)
+- 57,066+ 8-K filings processed, 2,085 flags detected
+- Flag data gated behind isVijay until Six-Stage Signal Gauntlet passed
+
+**Remaining for full Sentinel parity:**
+- INF-010 Phase 3: `pinnacle_sentinel_app` DB role
+- UI parity: red color scheme (#d4443f), NavBar Infrastructure dropdown
+- Platform Intelligence page
+- Data quality checks in pinnacle-ops
+- Sentinel → Quant flag integration (D-018)

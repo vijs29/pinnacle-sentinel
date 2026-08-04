@@ -955,3 +955,37 @@ Insider selling cluster detection (the actual flag-creation logic,
 querying this table for multiple distinct insiders selling within 30
 days) is the next real step -- ingestion alone doesn't create
 FlagEvent rows.
+---
+
+## D-021 — D-020 database consolidation (2026-08-04)
+
+**Context:** All platform products migrating to single `pinnacle_platform` database
+with product-prefixed table names (INF-010). Sentinel's tables were already migrated
+to `pinnacle_platform` by Quant Claude during the initial D-020 work. This entry
+records Sentinel's own model updates.
+
+**Decision:** Rename all Sentinel SQLAlchemy `__tablename__` values to use
+`pinnacle_sentinel_` prefix. `users` table points to `platform_users` (shared auth).
+
+**Table renames:**
+- `filings` → `pinnacle_sentinel_filings`
+- `flag_events` → `pinnacle_sentinel_flag_events`
+- `sentinel_outcomes` → `pinnacle_sentinel_outcomes`
+- `watchlist_items` → `pinnacle_sentinel_watchlist_items`
+- `financial_facts` → `pinnacle_sentinel_financial_facts`
+- `insider_transactions` → `pinnacle_sentinel_insider_transactions`
+- `quant_scores` → `pinnacle_sentinel_quant_scores`
+- `users` → `platform_users`
+
+**Status:** ✅ Implemented 2026-08-04. INF-010 Phase 3 (DB role separation) pending.
+
+---
+
+## D-022 — Platform standard /api/health endpoint (2026-08-04)
+
+**Context:** Platform standard requires `/api/health` to return
+`{"status": "ok", "product": "pinnacle-sentinel"}`.
+
+**Decision:** Updated health endpoint to match platform standard.
+
+**Status:** ✅ Implemented 2026-08-04.

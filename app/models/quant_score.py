@@ -10,7 +10,7 @@ from app.db.base import Base
 
 
 class QuantScore(Base):
-    __tablename__ = "quant_scores"
+    __tablename__ = "pinnacle_sentinel_quant_scores"
 
     id = Column(Integer, primary_key=True)
     cik = Column(String, nullable=False, index=True)

@@ -17,13 +17,27 @@ validated per FOUNDER_OPERATING_MANUAL.md's own standard.
 - [ ] **Run form4_ingest.py once more** after the current job finishes
       -- will naturally pick up the 9,461 gift-affected filings
       cleared in D-019, plus anything else still remaining
-- [ ] **Reconcile the contradictory "Quant Claude" prompt** received
-      2026-08-01 (claimed Dockerfile still on 8000, Caddyfile still on
-      8000, /api/health missing, FOUNDER_OPERATING_MANUAL.md belongs
-      in docs/, accent color settled, NavBar should copy Quant exactly
-      -- all contradicted by verified work in this session). Not
-      acted on. Needs Vijay's reconciliation before anything in it is
-      trusted.
+- [x] **Partially reconciled the "Quant Claude" prompt.** Confirmed
+      via Quant's own FOUNDER_OPERATING_MANUAL.md (docs/ copy) that
+      several claims were actually TRUE for Quant's own repo (real
+      work happened there: daily health-check email INF-005/006, a
+      session-audit script, docs genuinely moved to docs/, and an
+      independently-decided "no manual deploys, Ansible only" policy
+      INF-007, essentially matching D-020). The claims that were WRONG
+      were specifically the ones ASSUMING Sentinel needed the same
+      fixes without checking Sentinel's actual state (Dockerfile port,
+      Caddyfile port, /api/health -- all verified fine on Sentinel).
+      Lesson: that session has real, valid visibility into Quant's own
+      repo, but no visibility into Sentinel's -- don't trust claims
+      about OTHER products' state from a product-specific session
+      without independent verification, even when that session is
+      legitimate and doing real work.
+- [ ] **Known, deliberately NOT fixed by us**: our shared-content sync
+      writes FOUNDER_OPERATING_MANUAL.md to Quant's repo ROOT, but
+      Quant's real, referenced copy is at docs/ (their own team moved
+      it). Per Vijay's explicit instruction, not touching Quant's or
+      Veridia's own repo structure -- their own teams will handle
+      this if it matters to them.
 - [ ] **Veridia's real deploy** -- detailed briefing given (mirroring
       Quant's .env near-miss check), not yet run
 - [ ] **Quant's /api/health bug** -- returns SPA HTML not JSON, even
@@ -265,3 +279,22 @@ Vijay's own account until this gauntlet is complete.
    flags are validated, per Gauntlet rules)
 8. Resolve the brand-color and NavBar-standard conflicts
 9. Build the shared-content-via-Ansible architecture
+---
+
+## Completed 2026-08-04
+
+- [x] **D-020**: All models renamed to `pinnacle_sentinel_*` prefix
+- [x] **D-022**: `/api/health` returns platform standard response
+- [x] **Python 3.12.13**: Standardized across all products
+- [x] **`.venv-sentinel`**: Renamed from `.venv`
+- [x] **DATABASE_URL**: Updated to `pinnacle_platform` locally
+- [x] **Startup script**: Sentinel tabs added to pinnacle-infra startup.sh
+
+## Pending (priority order)
+
+1. INF-010 Phase 3 — `pinnacle_sentinel_app` DB role (no UPDATE/DELETE)
+2. UI parity — red color scheme, NavBar Infrastructure dropdown
+3. Platform Intelligence page
+4. Data quality checks in pinnacle-ops
+5. Sentinel → Quant flag integration (D-018)
+6. Deploy to EC2 via Ansible (--tags sentinel)

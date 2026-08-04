@@ -17,10 +17,10 @@ class InsiderTransaction(Base):
     which are NOT discretionary sales and should not count toward a
     selling-cluster signal), and rptOwnerCik as the stable per-insider
     identifier (not name matching, which can vary in formatting)."""
-    __tablename__ = "insider_transactions"
+    __tablename__ = "pinnacle_sentinel_insider_transactions"
 
     id = Column(Integer, primary_key=True)
-    filing_id = Column(Integer, ForeignKey("filings.id"), nullable=False, index=True)
+    filing_id = Column(Integer, ForeignKey("pinnacle_sentinel_filings.id"), nullable=False, index=True)
 
     issuer_cik = Column(String, nullable=False, index=True)
     ticker = Column(String, nullable=True, index=True)

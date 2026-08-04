@@ -5,7 +5,7 @@ from app.db.base import Base
 
 
 class Filing(Base):
-    __tablename__ = "filings"
+    __tablename__ = "pinnacle_sentinel_filings"
 
     id = Column(Integer, primary_key=True)
     cik = Column(String, nullable=False, index=True)
@@ -24,11 +24,11 @@ class Filing(Base):
 
 
 class FlagEvent(Base):
-    __tablename__ = "flag_events"
+    __tablename__ = "pinnacle_sentinel_flag_events"
 
     id = Column(Integer, primary_key=True)
-    filing_id = Column(Integer, ForeignKey("filings.id"), nullable=True)
-    quant_score_id = Column(Integer, ForeignKey("quant_scores.id"), nullable=True)
+    filing_id = Column(Integer, ForeignKey("pinnacle_sentinel_filings.id"), nullable=True)
+    quant_score_id = Column(Integer, ForeignKey("pinnacle_sentinel_quant_scores.id"), nullable=True)
     source_type = Column(String, nullable=False, default="disclosure")
     # "disclosure" -- traces to a Filing (late_filing, auditor_change, etc.)
     # "quantitative" -- traces to a QuantScore (sloan_ratio, beneish_m_score, altman_z_score)
@@ -49,10 +49,10 @@ class FlagEvent(Base):
 
 
 class SentinelOutcome(Base):
-    __tablename__ = "sentinel_outcomes"
+    __tablename__ = "pinnacle_sentinel_outcomes"
 
     id = Column(Integer, primary_key=True)
-    flag_event_id = Column(Integer, ForeignKey("flag_events.id"), nullable=False)
+    flag_event_id = Column(Integer, ForeignKey("pinnacle_sentinel_flag_events.id"), nullable=False)
     horizon_days = Column(Integer, nullable=False)  # 30, 90, 180, 365
     price_at_horizon = Column(Float, nullable=True)
     spy_return_pct = Column(Float, nullable=True)
@@ -67,7 +67,7 @@ class SentinelOutcome(Base):
 
 
 class WatchlistItem(Base):
-    __tablename__ = "watchlist_items"
+    __tablename__ = "pinnacle_sentinel_watchlist_items"
 
     id = Column(Integer, primary_key=True)
     cik = Column(String, nullable=False, index=True)

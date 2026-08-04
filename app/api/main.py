@@ -51,7 +51,7 @@ def scheduler_state():
 
 @app.get("/api/health")
 def health():
-    return {"status": "healthy"}
+    return {"status": "ok", "product": "pinnacle-sentinel"}
 
 @app.get("/api/filings")
 def get_filings(
