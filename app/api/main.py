@@ -37,7 +37,7 @@ def _startup():
     from app.db.base import Base
     from app.db.session import engine
     from app.models import filing, user, financial_fact, quant_score  # noqa: F401
-    Base.metadata.create_all(engine)
+    Base.metadata.create_all(engine, checkfirst=True)
 
     from app.services.scheduler_service import start_scheduler
     start_scheduler()
