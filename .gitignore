@@ -10,3 +10,5 @@ sentinel_dump.pgdump
 sentinel_dump.sql.gz
 sentinel_dump.sql
 *.pgdump
+.envrc
+.venv-sentinel/
