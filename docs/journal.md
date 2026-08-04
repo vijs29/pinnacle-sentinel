@@ -1257,3 +1257,35 @@ rows) -- ingestion alone doesn't create flags. Not yet built.
   - `[.venv-sentinel] Sentinel API :8010`
   - `[Vite] Sentinel UI :5180`
   - `[.venv-sentinel] Sentinel Commands`
+
+---
+
+## 2026-08-04 — Full platform session: D-020 complete, docs standardized, infra built out
+
+### Platform health at close (8:01am PT)
+- All 3 products: status ok
+- data_quality: 11 ok · 2 warnings · 0 failures
+
+### Completed this session
+- D-020: ALL THREE PRODUCTS on pinnacle_platform DB
+- INF-010 Phase 1+2: Quant + Veridia DB role separation
+- INF-011: pinnacle-ops container, veridia_db_sync.py, platform_cron_log
+- INF-012: startup.sh (9 tabs via ttab), shutdown.sh, session_check.py
+- INF-013: pinnacle-platform-hub repo created, 7-repo architecture
+- INF-015: CRON_REGISTRY.md, platform_cron_log heartbeat
+- Veridia: ETF market cap fix, 4 horizons, v0.2.0, Platform Intelligence page
+- Sentinel: D-020 complete, /api/health platform standard, FOUNDER_OPERATING_MANUAL
+- Docs: standard 8 docs across all product repos, infra, platform-hub
+- ttab installed, startup.sh working with 9 tabs
+
+### Pending for next session
+1. 31 Alpaca positions — auto-close at market open 9:30am ET
+2. INF-010 Phase 3 — Sentinel DB role
+3. Postgres password rotation
+4. startup.sh venv mismatch fix (20% cases)
+5. Data inventory page — what data exists, what's being done with it
+6. UI pages: Sentinel Platform Intelligence, cron status, platform hub UI
+7. Nightly FOUNDER_OPERATING_MANUAL assembly job
+8. platform.pinnacletranscore.com DNS + deploy
+9. Decommission old DBs
+
