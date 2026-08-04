@@ -33,7 +33,7 @@ from app.models.insider_transaction import InsiderTransaction
 
 SEC_HEADERS = {"User-Agent": "Vijay Sentinel vijay.cloudarchitect@gmail.com"}
 REQUEST_DELAY_SECONDS = 0.15
-MAX_WORKERS = 4
+MAX_WORKERS = 2  # reduced from 4 on 2026-08-01 after failure rate escalated 56%->94% across two long runs; being gentler in case of intermittent SEC throttling under sustained load
 
 
 def base_dir_url(cached_url: str) -> str:
