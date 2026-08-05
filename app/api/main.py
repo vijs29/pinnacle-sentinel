@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -156,3 +156,112 @@ if _UI_DIST.exists():
         if requested.is_file():
             return FileResponse(requested)
         return FileResponse(_UI_DIST / "index.html")
+
+@app.get("/api/platform/data-inventory")
+def get_data_inventory():
+    """Return row counts for all platform tables. Public — no auth required."""
+    from app.db.session import SessionLocal
+    from sqlalchemy import text
+
+    TABLE_META = {
+        "pinnacle_sentinel_filings":         {"product": "sentinel", "purpose": "SEC 8-K filings", "usage": "Red flag detection source"},
+        "pinnacle_sentinel_financial_facts":  {"product": "sentinel", "purpose": "XBRL financial facts", "usage": "Beneish M-Score, Altman Z-Score"},
+        "pinnacle_sentinel_flag_events":      {"product": "sentinel", "purpose": "Detected red flag events", "usage": "Sentinel screening results"},
+        "pinnacle_sentinel_outcomes":         {"product": "sentinel", "purpose": "Flag outcome tracking", "usage": "Validates flag predictive power"},
+        "pinnacle_sentinel_quant_scores":     {"product": "sentinel", "purpose": "Quantitative risk scores", "usage": "Beneish + Altman scoring"},
+        "pinnacle_sentinel_watchlist_items":  {"product": "sentinel", "purpose": "User watchlist companies", "usage": "Personalized monitoring"},
+        "pinnacle_quant_predictions":         {"product": "quant",    "purpose": "Signal predictions", "usage": "Quant signal engine"},
+        "pinnacle_quant_miss_analysis":       {"product": "quant",    "purpose": "Miss analysis records", "usage": "Signal validation"},
+        "pinnacle_quant_scan_results":        {"product": "quant",    "purpose": "Daily scan results", "usage": "Scanner output"},
+        "pinnacle_quant_paper_trades":        {"product": "quant",    "purpose": "Paper trade records", "usage": "Alpaca validation loop"},
+        "pinnacle_veridia_var_forecast":      {"product": "veridia",  "purpose": "VaR forecasts", "usage": "Daily risk forecasts"},
+        "pinnacle_veridia_breach_log":        {"product": "veridia",  "purpose": "VaR breach events", "usage": "Calibration grading"},
+        "platform_quality_checks":            {"product": "platform", "purpose": "Data quality results", "usage": "Platform Intelligence"},
+        "platform_cron_log":                  {"product": "platform", "purpose": "Cron job heartbeats", "usage": "Cron status page"},
+        "platform_users":                     {"product": "platform", "purpose": "User accounts", "usage": "Auth across all products"},
+        "platform_founder_manual":            {"product": "platform", "purpose": "Assembled founder manual", "usage": "Internal reference"},
+    }
+
+    db = SessionLocal()
+    try:
+        rows = db.execute(text("""
+            SELECT tablename, COALESCE(n_live_tup, 0) as row_count
+            FROM pg_stat_user_tables
+            WHERE schemaname = 'public'
+            ORDER BY tablename
+        """)).fetchall()
+
+        tables = []
+        by_product = {}
+        total_rows = 0
+
+        for row in rows:
+            name = row.tablename
+            count = int(row.row_count)
+            meta = TABLE_META.get(name, {})
+            product = meta.get("product", "unknown")
+            entry = {
+                "table_name": name,
+                "row_count":  count,
+                "product":    product,
+                "purpose":    meta.get("purpose", ""),
+                "usage":      meta.get("usage", ""),
+            }
+            tables.append(entry)
+            by_product.setdefault(product, []).append(entry)
+            total_rows += count
+
+        return {
+            "tables":       tables,
+            "by_product":   by_product,
+            "total_rows":   total_rows,
+            "total_tables": len(tables),
+        }
+    finally:
+        db.close()
+
+
+@app.get("/api/platform/quality-checks")
+def get_quality_checks(authorization: str = Header(None)):
+    """Return latest platform quality check results. Auth required."""
+    from app.db.session import SessionLocal
+    from app.core.security import decode_access_token
+    from sqlalchemy import text
+    from fastapi.responses import JSONResponse
+
+    if not authorization or not authorization.startswith("Bearer "):
+        return JSONResponse({"detail": "Not authenticated"}, status_code=401)
+    token = authorization.split(" ", 1)[1]
+    payload = decode_access_token(token)
+    if not payload:
+        return JSONResponse({"detail": "Invalid or expired token"}, status_code=401)
+
+    db = SessionLocal()
+    try:
+        last_run = db.execute(text(
+            "SELECT MAX(checked_at) FROM platform_quality_checks"
+        )).scalar()
+        rows = db.execute(text("""
+            SELECT check_name, status, detail, value, checked_at, product
+            FROM platform_quality_checks
+            WHERE checked_at = (SELECT MAX(checked_at) FROM platform_quality_checks)
+            ORDER BY product, check_name
+        """)).fetchall()
+        checks = [
+            {
+                "check_name": r.check_name,
+                "status":     r.status,
+                "detail":     r.detail,
+                "value":      r.value,
+                "checked_at": r.checked_at.isoformat() if r.checked_at else None,
+                "product":    r.product,
+            }
+            for r in rows
+        ]
+        return {
+            "checks":   checks,
+            "last_run": last_run.isoformat() if last_run else None,
+        }
+    finally:
+        db.close()
+

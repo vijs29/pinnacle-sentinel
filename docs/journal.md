@@ -1364,3 +1364,23 @@ pinnacle_sentinel_watchlist_items
 
 ---
 
+
+---
+
+## 2026-08-05 (cont.) — Platform endpoints added: data-inventory + quality-checks
+
+### /api/platform/data-inventory (public)
+- Same pattern as Quant and Veridia — row counts from pg_stat_user_tables
+- Returns all platform tables grouped by product with purpose + usage metadata
+- No auth required — consistent with platform standard
+- `Header` imported into FastAPI app
+
+### /api/platform/quality-checks (auth required)
+- Uses `decode_access_token` from `app.core.security` — matches Sentinel's auth pattern
+- `authorization: str = Header(None)` — reads Bearer token from HTTP header
+- Returns latest platform_quality_checks rows grouped by product
+- `Header` added to FastAPI imports (was missing)
+
+### Verification
+- `py_compile app/api/main.py` → OK
+- Deployed via Ansible --tags sentinel
