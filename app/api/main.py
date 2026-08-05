@@ -242,6 +242,47 @@ def get_quality_checks(authorization: str = Header(None)):
     finally:
         db.close()
 
+@app.get("/api/stats")
+def get_stats():
+    """Public stats for Landing page stats strip. No auth required."""
+    from app.db.session import SessionLocal
+    from sqlalchemy import text
+    from datetime import date, timedelta
+
+    def _trading_days(launch, today):
+        days, current = 0, launch
+        while current < today:
+            if current.weekday() < 5: days += 1
+            current += timedelta(days=1)
+        return days
+    trading_days = _trading_days(date(2026, 6, 18), date.today())
+
+    db = SessionLocal()
+    try:
+        rows = db.execute(text("""
+            SELECT relname as table_name, COALESCE(n_live_tup, 0) as row_count
+            FROM pg_stat_user_tables
+            WHERE schemaname = 'public'
+            AND relname IN (
+                'pinnacle_sentinel_filings',
+                'pinnacle_sentinel_financial_facts',
+                'pinnacle_sentinel_flag_events',
+                'pinnacle_sentinel_quant_scores'
+            )
+        """)).fetchall()
+        counts = {r.table_name: int(r.row_count) for r in rows}
+        return {
+            "filings_processed": counts.get("pinnacle_sentinel_filings", 0),
+            "financial_facts":   counts.get("pinnacle_sentinel_financial_facts", 0),
+            "flag_events":       counts.get("pinnacle_sentinel_flag_events", 0),
+            "companies_scored":  counts.get("pinnacle_sentinel_quant_scores", 0),
+            "flag_types":        4,
+            "calibration_day":   trading_days,
+        }
+    finally:
+        db.close()
+
+
 # --------------------------------------------------------------------------
 # Static UI serving (production only -- local dev uses Vite's own dev server
 # on :5180 instead, per CORS origin above). Built React app lives in
