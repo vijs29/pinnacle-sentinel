@@ -1354,15 +1354,13 @@ pinnacle_sentinel_watchlist_items
 - Canonical file: `pinnacle-sentinel/docs/FOUNDER_OPERATING_MANUAL.md` — untouched
 - Cleanup run by `pinnacle-infra/tools/cleanup_founder_manual_dupes.py` (INF-014)
 
+## 2026-08-05 (cont.) — Session audit built + standardized (canonical module)
+
+- `scripts/session_audit.py` built for first time — Sentinel was the only product missing it
+- Thin wrapper importing canonical module: `pinnacle-infra/tools/platform_session_audit.py`
+- Product-specific: DB connectivity check + `pinnacle_sentinel_filings` row count
+- New check: Production health (`https://sentinel.pinnacletranscore.com/api/health`)
+- Result: 0 errors · 0 warnings · 10 ok
+
 ---
 
-## 2026-08-05 — INF-014: Platform Documentation section added to METHODOLOGY
-
-- `docs/METHODOLOGY.md` updated with Platform Documentation section (INF-014)
-- Documents the self-documenting platform architecture:
-  - Each product owns `docs/FOUNDER_OPERATING_MANUAL.md` as canonical source
-  - Nightly assembler on EC2 combines all 4 into master document in platform-hub
-  - Auth-gated endpoint `/api/platform/founder-manual` serves content from DB
-  - Mac sync via launchd at 6:15pm PT — Mac never assembles
-- Version History updated to v2.0
-- Full technical narrative in `pinnacle-platform-hub/docs/METHODOLOGY.md`
