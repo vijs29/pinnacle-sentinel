@@ -132,6 +132,42 @@ When Stage 4 begins:
 
 ---
 
+## Session Audit Methodology (INF-017)
+
+### What it is
+A platform-wide discipline that catches drift between documentation and reality
+before it compounds. Runs at the start and end of every working session.
+
+### Standard checks (all products)
+
+| Check | What it catches |
+|-------|-----------------|
+| Venv correct | Wrong Python environment — silently breaks installs |
+| Directory correct | Running from wrong repo — patches land in wrong place |
+| Journal current | Missing entry after commits — future sessions get stale context |
+| Git clean | Uncommitted changes — work lost if session ends |
+| Key docs committed | decisions.md, strategy.md, FOUNDER_OPERATING_MANUAL.md |
+| Sync with origin | Local diverged from remote |
+| **Production health** |  on live URL — catches post-deploy failures |
+| Ledger presence | JSONL ledger exists where expected |
+| DB connectivity | Database reachable with correct credentials |
+
+### Architecture — canonical module + thin wrapper
+One canonical module handles all standard checks. This product wraps it with
+its own configuration. When the platform standard changes, only one file updates.
+
+
+
+### Standard — 0 errors before closing any session
+Warnings are acceptable mid-session. Errors are not. A session that ends
+with errors has left the platform in an inconsistent state.
+
+### Full documentation
+Complete architecture, check table, and adding-new-product instructions:
+ → Session Audit Methodology
+
+---
+
 ## Platform Documentation (INF-014)
 
 ### The self-documenting platform
@@ -173,5 +209,6 @@ Full architecture, pipeline diagram, and design rationale documented in:
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 3.0 | Aug 2026 | Session Audit Methodology section added (INF-017). |
 | 2.0 | Aug 2026 | Platform Documentation section added (INF-014 self-documenting platform). |
 | 1.0 | Aug 2026 | Initial methodology document. 12 flags documented, Six-Stage Gauntlet status, confluence scoring, known limitations. |
