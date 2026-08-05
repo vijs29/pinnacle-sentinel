@@ -1384,3 +1384,28 @@ pinnacle_sentinel_watchlist_items
 ### Verification
 - `py_compile app/api/main.py` → OK
 - Deployed via Ansible --tags sentinel
+
+---
+
+## 2026-08-05 (cont.) — Three bugs fixed in data-inventory endpoint
+
+### Bug 1 — Static file catch-all intercepting API route
+- New endpoints were appended AFTER the static file mount in main.py
+- FastAPI matches routes in registration order — catch-all `/{full_path:path}` was intercepting
+- Fix: moved platform endpoints BEFORE the static UI serving section (line 137 vs line 257)
+
+### Bug 2 — @ in sentinel_app_password causing malformed DATABASE_URL
+- Password contains `@` — URL was `pinnacle_sentinel_app:password@@pinnacle-db-1`
+- Double `@@` caused PostgreSQL to attempt socket connection instead of TCP
+- Fix: `vault_sentinel_app_password | replace("@", "%40")` in `sentinel.env.j2`
+- Applied in pinnacle-infra, deployed via Ansible
+
+### Bug 3 — pg_stat_user_tables column name
+- Query used `tablename` — correct column name is `relname`
+- Fixed with `SELECT relname as tablename` alias
+
+### Verified
+- `curl /api/platform/data-inventory` → 200 JSON ✓
+- total_rows: 1,334,097 · total_tables: 32
+- Sentinel tables: filings 365,387 · financial_facts 851,731 · flag_events 2,746
+
