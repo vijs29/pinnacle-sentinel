@@ -132,8 +132,46 @@ When Stage 4 begins:
 
 ---
 
+## Platform Documentation (INF-014)
+
+### The self-documenting platform
+
+This product is one of four components in a self-documenting platform architecture.
+Each product maintains its own `docs/FOUNDER_OPERATING_MANUAL.md` — the authoritative
+record of how it is built, validated, deployed, and operated. Every night at 9pm ET,
+an automated assembler reads all four documents and publishes a unified master document.
+
+**The platform documents itself. No human assembles it. No human forgets to update it.**
+
+The assembled master document is served through this product's
+`/api/platform/founder-manual` endpoint (auth-gated) and is available to
+authorized users via the Founder's Manual link in the Infrastructure dropdown.
+
+### Why this matters
+
+Distributed documentation drifts. A central document becomes a bottleneck.
+The Pinnacle solution: each product owns its truth, the assembler owns the synthesis.
+Edit this product's `docs/FOUNDER_OPERATING_MANUAL.md` and by 9pm ET tonight,
+the master document reflects the change.
+
+### Technical details
+
+Full architecture, pipeline diagram, and design rationale documented in:
+**Pinnacle Platform Hub → Methodology → The Self-Documenting Platform (INF-014)**
+
+| Item | Detail |
+|------|--------|
+| Source file | `docs/FOUNDER_OPERATING_MANUAL.md` (this repo — edit here) |
+| Assembled output | `pinnacle-platform-hub/docs/FOUNDER_OPERATING_MANUAL.md` (never edit directly) |
+| DB table | `platform_founder_manual` (id=1, upserted nightly) |
+| Endpoint | `GET /api/platform/founder-manual` (auth required) |
+| Assembly schedule | Nightly 9pm ET via pinnacle-ops cron (INF-014) |
+
+---
+
 ## Version History
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 2.0 | Aug 2026 | Platform Documentation section added (INF-014 self-documenting platform). |
 | 1.0 | Aug 2026 | Initial methodology document. 12 flags documented, Six-Stage Gauntlet status, confluence scoring, known limitations. |
