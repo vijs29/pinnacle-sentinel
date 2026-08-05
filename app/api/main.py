@@ -134,29 +134,6 @@ def get_flags_summary():
     finally:
         db.close()
 
-
-# --------------------------------------------------------------------------
-# Static UI serving (production only -- local dev uses Vite's own dev server
-# on :5180 instead, per CORS origin above). Built React app lives in
-# ui/dist/ after `npm run build`. Mounted LAST so it never shadows /api/*
-# routes -- FastAPI matches routes in registration order, and StaticFiles'
-# catch-all would otherwise intercept API calls first.
-# ---------------------------------------------------------------------------
-_UI_DIST = Path(__file__).resolve().parents[2] / "ui" / "dist"
-
-if _UI_DIST.exists():
-    app.mount("/assets", StaticFiles(directory=_UI_DIST / "assets"), name="assets")
-
-    @app.get("/{full_path:path}")
-    def serve_spa(full_path: str):
-        """Catch-all for client-side routing (react-router) -- any path
-        not matched by an API route above serves index.html, letting the
-        React app's own router handle it."""
-        requested = _UI_DIST / full_path
-        if requested.is_file():
-            return FileResponse(requested)
-        return FileResponse(_UI_DIST / "index.html")
-
 @app.get("/api/platform/data-inventory")
 def get_data_inventory():
     """Return row counts for all platform tables. Public — no auth required."""
@@ -265,3 +242,24 @@ def get_quality_checks(authorization: str = Header(None)):
     finally:
         db.close()
 
+# --------------------------------------------------------------------------
+# Static UI serving (production only -- local dev uses Vite's own dev server
+# on :5180 instead, per CORS origin above). Built React app lives in
+# ui/dist/ after `npm run build`. Mounted LAST so it never shadows /api/*
+# routes -- FastAPI matches routes in registration order, and StaticFiles'
+# catch-all would otherwise intercept API calls first.
+# ---------------------------------------------------------------------------
+_UI_DIST = Path(__file__).resolve().parents[2] / "ui" / "dist"
+
+if _UI_DIST.exists():
+    app.mount("/assets", StaticFiles(directory=_UI_DIST / "assets"), name="assets")
+
+    @app.get("/{full_path:path}")
+    def serve_spa(full_path: str):
+        """Catch-all for client-side routing (react-router) -- any path
+        not matched by an API route above serves index.html, letting the
+        React app's own router handle it."""
+        requested = _UI_DIST / full_path
+        if requested.is_file():
+            return FileResponse(requested)
+        return FileResponse(_UI_DIST / "index.html")
