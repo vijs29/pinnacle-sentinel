@@ -1289,3 +1289,58 @@ rows) -- ingestion alone doesn't create flags. Not yet built.
 8. platform.pinnacletranscore.com DNS + deploy
 9. Decommission old DBs
 
+
+---
+
+## 2026-08-04 (cont.) — INF-010 Phase 3: Sentinel DB role separation
+
+### Problem
+Sentinel connected to `pinnacle_platform` as the `pinnacle` superuser —
+same class of issue INF-010 fixed for Quant (Phase 1) and Veridia (Phase 2).
+`Base.metadata.create_all()` ran on startup via `DATABASE_URL`, meaning the
+runtime role needed DDL privileges. Goal: least-privilege runtime role
+(`pinnacle_sentinel_app`) with no DDL access, superuser retained for
+migrations only via `DATABASE_ADMIN_URL`.
+
+### Changes — pinnacle-sentinel
+
+**app/db/session.py**
+- `DATABASE_ADMIN_URL` added: reads `os.getenv("DATABASE_ADMIN_URL", DATABASE_URL)`
+- `admin_engine` added: `create_engine(DATABASE_ADMIN_URL)`
+- Fallback to `DATABASE_URL` means local dev requires no config change
+- Runtime `engine` / `SessionLocal` unchanged — all app queries unaffected
+
+**app/api/main.py**
+- `_startup()`: switched `create_all(engine)` → `create_all(admin_engine)`
+- Import changed: `from app.db.session import admin_engine`
+- All other routes and query paths use `engine` (runtime role) — untouched
+
+### Changes — pinnacle-infra (pending deploy)
+
+**roles/pinnacle_product/templates/sentinel.env.j2**
+- `DATABASE_URL` → `pinnacle_sentinel_app` restricted role
+- `DATABASE_ADMIN_URL` → `pinnacle` superuser added
+
+**roles/postgres/tasks/main.yml**
+- Step 7 added: creates `pinnacle_sentinel_app` role if not exists
+- Grants: `SELECT, INSERT, UPDATE` on all 6 `pinnacle_sentinel_*` tables
+  (`filings`, `financial_facts`, `flag_events`, `outcomes`, `quant_scores`,
+  `watchlist_items`)
+- Grants: `SELECT` on `platform_users` (for auth)
+- `no_log: true` — password never logged
+- Tag: `[db_users, sentinel]`
+
+### Verified
+- `py_compile app/db/session.py app/api/main.py` → OK
+- Sentinel code committed and pushed
+- Infra patch pending: deploy `--tags sentinel` will apply role + updated .env
+
+### Sentinel tables confirmed on EC2 (6 tables)
+```
+pinnacle_sentinel_filings
+pinnacle_sentinel_financial_facts
+pinnacle_sentinel_flag_events
+pinnacle_sentinel_outcomes
+pinnacle_sentinel_quant_scores
+pinnacle_sentinel_watchlist_items
+```
