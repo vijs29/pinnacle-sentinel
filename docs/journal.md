@@ -5,6 +5,16 @@
 
 ---
 
+## 2026-08-05 (cont.) — D-JOUR-001: Journal reorganized to newest-first
+
+- Sentinel's journal was oldest-first (Jul 20 → Aug 5), unlike Quant and Veridia
+- Reorganized to newest-first — INF-018 cross-platform consistency standard
+- Header updated: "Newest entry last" → "Newest entry first"
+- All 1,424 lines preserved, order reversed, no content lost
+- decisions.md updated: D-JOUR-001
+
+---
+
 ## 2026-08-05 (cont.) — INF-018: /api/stats endpoint added
 
 ### /api/stats (public, no auth)
