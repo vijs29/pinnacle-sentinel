@@ -5,6 +5,28 @@
 > If a decision is reversed, add a new entry that supersedes the old one and
 > say so explicitly -- do not delete history. (Same append-only ethos as
 > Pinnacle Veridia's decisions.md.)
+## D-JOUR-001 — Journal order standardized to newest-first (2026-08-05)
+
+**Context:** Sentinel's `docs/journal.md` was written oldest-first (July 20 →
+August 5), with a header comment explicitly noting this differed from Quant's
+newest-first convention. This created a platform inconsistency — three products,
+two journal orderings.
+
+**Decision:** Standardize all product journals to newest-first. Sentinel's
+journal reorganized on 2026-08-05 to match Quant and Veridia.
+
+**Rationale:**
+- Newest-first is more useful in practice — the most recent work is visible
+  immediately without scrolling through months of history
+- Cross-platform consistency (INF-018) — same convention across all products
+  means Claude sessions and collaborators don't need to remember which product
+  uses which order
+- The old "newest entry last" header comment has been updated to "newest entry first"
+
+**Status:** ✅ Done (2026-08-05). 1,424 lines reorganized, all entries preserved.
+
+---
+
 
 ---
 
