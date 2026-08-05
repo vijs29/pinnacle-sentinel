@@ -1353,3 +1353,16 @@ pinnacle_sentinel_watchlist_items
 - This was an identical copy of `pinnacle-infra/shared_content/FOUNDER_OPERATING_MANUAL.md`
 - Canonical file: `pinnacle-sentinel/docs/FOUNDER_OPERATING_MANUAL.md` — untouched
 - Cleanup run by `pinnacle-infra/tools/cleanup_founder_manual_dupes.py` (INF-014)
+
+---
+
+## 2026-08-05 — INF-014: Platform Documentation section added to METHODOLOGY
+
+- `docs/METHODOLOGY.md` updated with Platform Documentation section (INF-014)
+- Documents the self-documenting platform architecture:
+  - Each product owns `docs/FOUNDER_OPERATING_MANUAL.md` as canonical source
+  - Nightly assembler on EC2 combines all 4 into master document in platform-hub
+  - Auth-gated endpoint `/api/platform/founder-manual` serves content from DB
+  - Mac sync via launchd at 6:15pm PT — Mac never assembles
+- Version History updated to v2.0
+- Full technical narrative in `pinnacle-platform-hub/docs/METHODOLOGY.md`
