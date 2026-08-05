@@ -162,7 +162,7 @@ def get_data_inventory():
     db = SessionLocal()
     try:
         rows = db.execute(text("""
-            SELECT tablename, COALESCE(n_live_tup, 0) as row_count
+            SELECT relname as tablename, COALESCE(n_live_tup, 0) as row_count
             FROM pg_stat_user_tables
             WHERE schemaname = 'public'
             ORDER BY tablename
