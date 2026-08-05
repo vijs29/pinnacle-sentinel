@@ -1344,3 +1344,12 @@ pinnacle_sentinel_outcomes
 pinnacle_sentinel_quant_scores
 pinnacle_sentinel_watchlist_items
 ```
+
+---
+
+## 2026-08-04 (cont.) — INF-014: FOUNDER_OPERATING_MANUAL duplicate removed
+
+- Stale root-level `FOUNDER_OPERATING_MANUAL.md` (19402 bytes, Aug 1) deleted
+- This was an identical copy of `pinnacle-infra/shared_content/FOUNDER_OPERATING_MANUAL.md`
+- Canonical file: `pinnacle-sentinel/docs/FOUNDER_OPERATING_MANUAL.md` — untouched
+- Cleanup run by `pinnacle-infra/tools/cleanup_founder_manual_dupes.py` (INF-014)
