@@ -21,7 +21,7 @@
  *   registerPath   {string}  e.g. '/register'
  */
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 
 // ── Standard Infrastructure dropdown links (identical across all products) ──
@@ -44,22 +44,12 @@ function emailFromToken(token) {
 }
 
 // ── Dropdown component ────────────────────────────────────────────────────────
-function NavDropdown({ label, links, accentColor, isOpen, onToggle, onClose, pathname }) {
-  const ref = useRef(null)
-
-  useEffect(() => {
-    function onOutside(e) {
-      if (ref.current && !ref.current.contains(e.target)) onClose()
-    }
-    document.addEventListener('mousedown', onOutside)
-    return () => document.removeEventListener('mousedown', onOutside)
-  }, [onClose])
-
+function NavDropdown({ label, links, accentColor, isOpen, onToggle, onClose, pathname, dropRef }) {
   const isActive = links.some(l => pathname.startsWith(l.path.split('?')[0]))
   const navigate = useNavigate()
 
   return (
-    <div ref={ref} style={{ position: 'relative' }}>
+    <div ref={dropRef} style={{ position: 'relative' }}>
       <button
         onClick={onToggle}
         style={{
@@ -141,6 +131,19 @@ export default function PinnacleNavBar({
 
   // ── Dropdown open state — one per dropdown key ─────────────────────────────
   const [openKey, setOpenKey]         = useState(null)
+  const closeDropdown = useCallback(() => setOpenKey(null), [])
+  const dropdownRefs  = useRef({})
+
+  // Single outside-click handler for all dropdowns
+  useEffect(() => {
+    function onOutside(e) {
+      if (openKey === null) return
+      const ref = dropdownRefs.current[openKey]
+      if (ref && !ref.contains(e.target)) setOpenKey(null)
+    }
+    document.addEventListener('mousedown', onOutside)
+    return () => document.removeEventListener('mousedown', onOutside)
+  }, [openKey])
   const [accountOpen, setAccountOpen] = useState(null)
   const accountRef                    = useRef(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -317,8 +320,9 @@ export default function PinnacleNavBar({
                 accentColor={accentColor}
                 isOpen={openKey === d.key}
                 onToggle={() => setOpenKey(openKey === d.key ? null : d.key)}
-                onClose={() => setOpenKey(null)}
+                onClose={closeDropdown}
                 pathname={pathname}
+                dropRef={el => dropdownRefs.current[d.key] = el}
               />
             ))}
 

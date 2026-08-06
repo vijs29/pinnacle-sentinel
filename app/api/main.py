@@ -134,6 +134,35 @@ def get_flags_summary():
     finally:
         db.close()
 
+@app.get("/api/platform/methodology")
+def get_platform_methodology():
+    """Return assembled MASTER_METHODOLOGY.md. Public — no auth required.
+    Content assembled nightly at 9:05pm ET by INF-016 assemble_methodology.py.
+    Returns: content (markdown), assembled_at (ISO timestamp), line_count."""
+    from app.db.session import SessionLocal
+    from sqlalchemy import text
+    db = SessionLocal()
+    try:
+        row = db.execute(text(
+            "SELECT content, assembled_at, line_count "
+            "FROM platform_methodology WHERE id = 1"
+        )).fetchone()
+        if not row:
+            return {
+                "content": "",
+                "assembled_at": None,
+                "line_count": 0,
+                "message": "Methodology not yet assembled — runs nightly at 9:05pm ET",
+            }
+        return {
+            "content":      row[0],
+            "assembled_at": row[1].isoformat() if row[1] else None,
+            "line_count":   row[2],
+        }
+    finally:
+        db.close()
+
+
 @app.get("/api/platform/data-inventory")
 def get_data_inventory():
     """Return row counts for all platform tables. Public — no auth required."""

@@ -20,9 +20,10 @@ const DROPDOWNS = [
     key: 'methodology',
     label: 'Methodology',
     links: [
-      { path: '/methodology', label: 'Our Methodology' },
-      { path: '/validation',  label: 'Flag Validation' },
-      { path: '/scoring',     label: 'Scoring Model' },
+      { path: '/methodology',          label: 'Our Methodology' },
+      { path: '/validation',            label: 'Flag Validation' },
+      { path: '/scoring',               label: 'Scoring Model' },
+      { path: '/platform-methodology',  label: 'Platform Methodology' },
     ],
   },
   {
