@@ -26,13 +26,13 @@ import { useNavigate, useLocation } from 'react-router-dom'
 
 // ── Standard Infrastructure dropdown links (identical across all products) ──
 export const STANDARD_INFRA_LINKS = [
+  { path: '/platform-intelligence',             label: 'Platform Intelligence' },
   { path: '/infrastructure?section=ansible',    label: 'Ansible' },
   { path: '/infrastructure?section=terraform',  label: 'Terraform' },
   { path: '/infrastructure?section=containers', label: 'Docker & Containers' },
   { path: '/infrastructure?section=aws',        label: 'AWS Services' },
   { path: '/infrastructure?section=security',   label: 'Security' },
   { path: '/infrastructure',                    label: 'Platform Overview' },
-  { path: '/platform-intelligence',             label: 'Platform Intelligence' },
 ]
 
 // ── Token helpers ─────────────────────────────────────────────────────────────
@@ -178,7 +178,7 @@ export default function PinnacleNavBar({
     ...dropdowns.flatMap(d => d.links.map(l => ({ ...l, group: d.label }))),
   ]
 
-  const GAP = 18
+  const GAP = 12
 
   return (
     <div style={{
@@ -283,7 +283,7 @@ export default function PinnacleNavBar({
       {/* ── Desktop nav row ───────────────────────────────────────────────── */}
       {!isMobile && (
         <>
-          <div style={{ display: 'flex', alignItems: 'center', gap: GAP }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: GAP, width: '100%' }}>
 
             {/* Back / Home */}
             {!hideBackHome && (
@@ -306,7 +306,7 @@ export default function PinnacleNavBar({
               <span style={{ color: accentColor }}>{wordmark}</span>
             </div>
 
-            <div style={{ flex: 1 }} />
+            <div style={{ minWidth: 32, flexShrink: 0 }} />
 
             {/* Dropdowns */}
             {dropdowns.map(d => (
@@ -339,14 +339,13 @@ export default function PinnacleNavBar({
                 }}
               >{link.label}</button>
             ))}
-          </div>
 
-          {/* Account row — below nav, flush right */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginTop: 6, minHeight: 24 }}>
-            {subtitle && (
-              <div style={{ flex: 1, fontSize: 11, color: 'var(--text-muted)' }}>{subtitle}</div>
-            )}
-            {isLoggedIn ? (
+            {/* Account — inline at far right */}
+            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+              {subtitle && (
+                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{subtitle}</span>
+              )}
+              {isLoggedIn ? (
               <div ref={accountRef} style={{ position: 'relative' }}>
                 <div
                   onClick={() => setAccountOpen(o => !o)}
@@ -407,7 +406,8 @@ export default function PinnacleNavBar({
                   style={{ color: '#ffffff', fontSize: 12, cursor: 'pointer' }}>Login</span>
               </div>
             )}
-          </div>
+            </div>{/* end account inline */}
+          </div>{/* end main nav row */}
         </>
       )}
     </div>

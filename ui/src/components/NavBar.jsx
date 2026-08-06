@@ -32,7 +32,6 @@ const DROPDOWNS = [
       { path: '/flag-analysis',         label: 'Flag Analysis' },
       { path: '/beneish',               label: 'Beneish M-Score' },
       { path: '/altman',                label: 'Altman Z-Score' },
-      { path: '/platform-intelligence', label: 'Platform Intelligence' },
     ],
   },
   {
