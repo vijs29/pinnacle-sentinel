@@ -5,6 +5,21 @@
 
 ---
 
+## 2026-08-06 — D-NAV-001: Shared NavBar installed
+
+- `PinnacleNavBar.jsx` installed from canonical source
+- `NavBar.jsx` wrapper: 6 positions, Sentinel red accent (#d4443f)
+- Dropdowns: Infrastructure, Methodology, Analysis, Portfolios, Red Flags
+- Direct links: Screener, Watchlist
+- Analysis: Platform Intelligence removed (was duplicate of Infrastructure item)
+- My Account: My Watchlist, My Alerts, Logout
+- Platform Intelligence at top of Infrastructure ✓
+- Single row with inline account ✓
+- Deployed and verified: sentinel.pinnacletranscore.com ✓
+
+
+---
+
 ## 2026-08-05 (cont.) — D-JOUR-001: Journal reorganized to newest-first
 
 - Sentinel's journal was oldest-first (Jul 20 → Aug 5), unlike Quant and Veridia
