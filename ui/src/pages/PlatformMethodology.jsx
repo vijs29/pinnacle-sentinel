@@ -22,18 +22,20 @@ const TABS = [
 function splitByProduct(content) {
   if (!content) return {}
   const sections = {}
-  const parts = content.split(/^---$/m)
+  // Split on --- separator lines
+  const parts = content.split(/\n---\n/)
   for (const part of parts) {
     const trimmed = part.trim()
     if (!trimmed) continue
-    if (trimmed.includes('> **Pinnacle Quant**')) {
-      sections.quant = trimmed.replace(/^> \*\*Pinnacle Quant\*\*\n?/, '').trim()
-    } else if (trimmed.includes('> **Pinnacle Veridia**')) {
-      sections.veridia = trimmed.replace(/^> \*\*Pinnacle Veridia\*\*\n?/, '').trim()
-    } else if (trimmed.includes('> **Pinnacle Sentinel**')) {
-      sections.sentinel = trimmed.replace(/^> \*\*Pinnacle Sentinel\*\*\n?/, '').trim()
-    } else if (trimmed.includes('> **Pinnacle Infrastructure**')) {
-      sections.infra = trimmed.replace(/^> \*\*Pinnacle Infrastructure\*\*\n?/, '').trim()
+    const firstLine = trimmed.split('\n')[0].trim()
+    if (firstLine === '> **Pinnacle Quant**') {
+      sections.quant = trimmed.replace(/^> \*\*Pinnacle Quant\*\*\s*\n/, '').trim()
+    } else if (firstLine === '> **Pinnacle Veridia**') {
+      sections.veridia = trimmed.replace(/^> \*\*Pinnacle Veridia\*\*\s*\n/, '').trim()
+    } else if (firstLine === '> **Pinnacle Sentinel**') {
+      sections.sentinel = trimmed.replace(/^> \*\*Pinnacle Sentinel\*\*\s*\n/, '').trim()
+    } else if (firstLine === '> **Pinnacle Infrastructure**') {
+      sections.infra = trimmed.replace(/^> \*\*Pinnacle Infrastructure\*\*\s*\n/, '').trim()
     }
   }
   return sections
