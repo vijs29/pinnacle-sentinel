@@ -22,21 +22,29 @@ const TABS = [
 function splitByProduct(content) {
   if (!content) return {}
   const sections = {}
-  // Split on --- separator lines
-  const parts = content.split(/\n---\n/)
-  for (const part of parts) {
-    const trimmed = part.trim()
-    if (!trimmed) continue
-    const firstLine = trimmed.split('\n')[0].trim()
-    if (firstLine === '> **Pinnacle Quant**') {
-      sections.quant = trimmed.replace(/^> \*\*Pinnacle Quant\*\*\s*\n/, '').trim()
-    } else if (firstLine === '> **Pinnacle Veridia**') {
-      sections.veridia = trimmed.replace(/^> \*\*Pinnacle Veridia\*\*\s*\n/, '').trim()
-    } else if (firstLine === '> **Pinnacle Sentinel**') {
-      sections.sentinel = trimmed.replace(/^> \*\*Pinnacle Sentinel\*\*\s*\n/, '').trim()
-    } else if (firstLine === '> **Pinnacle Infrastructure**') {
-      sections.infra = trimmed.replace(/^> \*\*Pinnacle Infrastructure\*\*\s*\n/, '').trim()
+  const MARKERS = {
+    quant:    '> **Pinnacle Quant**',
+    veridia:  '> **Pinnacle Veridia**',
+    sentinel: '> **Pinnacle Sentinel**',
+    infra:    '> **Pinnacle Infrastructure**',
+  }
+  const stripFooter = (s) => s
+    .replace(/Auto-assembled nightly from each product[\s\S]*?9:05pm ET\.?/g, '')
+    .trim()
+
+  const keys = Object.keys(MARKERS)
+  for (let i = 0; i < keys.length; i++) {
+    const key    = keys[i]
+    const marker = MARKERS[key]
+    const start  = content.indexOf(marker)
+    if (start === -1) continue
+    let end = content.length
+    for (let j = i + 1; j < keys.length; j++) {
+      const nextStart = content.indexOf(MARKERS[keys[j]])
+      if (nextStart !== -1 && nextStart < end) end = nextStart
     }
+    const section = content.slice(start + marker.length, end).trim()
+    sections[key] = stripFooter(section)
   }
   return sections
 }
