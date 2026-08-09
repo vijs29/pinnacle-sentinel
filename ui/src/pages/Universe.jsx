@@ -16,7 +16,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import NavBar from '../components/NavBar'
 
-const QUANT_BASE = 'https://quant.pinnacletranscore.com'
+const QUANT_BASE = 'https://platform.pinnacletranscore.com'
 
 const SIGNAL_COLORS = {
   green: '#1d9e75',
