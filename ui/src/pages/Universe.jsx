@@ -2,7 +2,7 @@
  * Universe.jsx — 126 tickers × 3 lenses (Quant + Veridia + Sentinel)
  * Location: ui/src/pages/Universe.jsx (all three products)
  *
- * Reads from /api/universe (Quant backend — has cross-product DB access).
+ * Reads from /api/universe on platform.pinnacletranscore.com (D-HUB-001).
  * Free tier — no auth required.
  *
  * Columns:
