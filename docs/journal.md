@@ -5,6 +5,26 @@
 
 ---
 
+## 2026-08-09 — D-HUB-001: Universe endpoint added; service renamed
+
+### /api/universe cross-product endpoint added
+- `/api/universe` added to Sentinel backend (INF-018 consistency)
+- Cross-product SELECT grants: `pinnacle_sentinel_app` can read `pinnacle_quant_scan_results` and `pinnacle_veridia_var_forecast`
+- Returns 126 tickers × 3 lenses — identical to platform hub and Quant
+- Verified: `curl https://sentinel.pinnacletranscore.com/api/universe` → 126 tickers ✓
+
+### Service renamed
+- `sentinel-app` → `pinnacle-sentinel-app` in `docker-compose.prod.yml` (EC2)
+- Matches Ansible vars.yml `service_name: pinnacle-sentinel-app`
+- Caddy updated: `reverse_proxy pinnacle-sentinel-app:8010`
+
+### PlatformMethodology + ComingSoon + Universe pages
+- All three shared pages installed
+- `/universe`, `/platform-methodology`, `/portfolios` routes wired
+- Platform Methodology link added to Methodology dropdown
+
+---
+
 ## 2026-08-06 — D-NAV-001: Shared NavBar installed
 
 - `PinnacleNavBar.jsx` installed from canonical source
