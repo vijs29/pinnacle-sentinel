@@ -163,6 +163,107 @@ def get_platform_methodology():
         db.close()
 
 
+@app.get("/api/universe")
+def get_universe():
+    """Universe view — 126 tickers × 3 lenses (Quant + Veridia + Sentinel).
+    Public — no auth required. Single query across all three product tables.
+    Returns plain-English labels suitable for non-expert users."""
+    from app.db.session import SessionLocal
+    from sqlalchemy import text
+
+    ROUTING_LABELS = {
+        "STRONG_SIGNAL": "Strong Buy",
+        "SIGNAL":        "Buy",
+        "WATCH":         "Watch",
+        "AVOID":         "Avoid",
+        "NO_SIGNAL":     "Neutral",
+    }
+
+    ROUTING_COLORS = {
+        "STRONG_SIGNAL": "green",
+        "SIGNAL":        "gold",
+        "WATCH":         "amber",
+        "AVOID":         "red",
+        "NO_SIGNAL":     "muted",
+    }
+
+    db = SessionLocal()
+    try:
+        rows = db.execute(text("""
+            SELECT
+                s.symbol,
+                s.score,
+                s.routing,
+                s.action,
+                s.price,
+                s.change_pct,
+                v.var_return,
+                v.wide_band,
+                COUNT(f.id)                                                          AS flag_count,
+                COALESCE(
+                    array_agg(DISTINCT f.flag_type)
+                    FILTER (WHERE f.flag_type IS NOT NULL),
+                    ARRAY[]::varchar[]
+                )                                                                    AS flag_types
+            FROM pinnacle_quant_scan_results s
+            LEFT JOIN pinnacle_veridia_var_forecast v
+                ON  v.ticker        = s.symbol
+                AND v.model         = 'garch_t'
+                AND v.horizon_days  = 5
+                AND v.as_of_date    = (SELECT MAX(as_of_date)
+                                       FROM pinnacle_veridia_var_forecast)
+            LEFT JOIN pinnacle_sentinel_flag_events f
+                ON  f.ticker        = s.symbol
+                AND f.filing_date   >= CURRENT_DATE - INTERVAL '365 days'
+            WHERE s.scanned_at = (SELECT MAX(scanned_at)
+                                  FROM pinnacle_quant_scan_results)
+            GROUP BY
+                s.symbol, s.score, s.routing, s.action,
+                s.price, s.change_pct, v.var_return, v.wide_band
+            ORDER BY s.score DESC NULLS LAST
+        """)).fetchall()
+
+        tickers = []
+        for r in rows:
+            routing = r.routing or "NO_SIGNAL"
+            var_pct = round(r.var_return * 100, 1) if r.var_return is not None else None
+            flag_types = list(r.flag_types) if r.flag_types else []
+
+            tickers.append({
+                # ── Identity ──────────────────────────────────────────────
+                "ticker": r.symbol,
+                "price":  round(r.price, 2) if r.price else None,
+                "change_pct": round(r.change_pct, 2) if r.change_pct else None,
+
+                # ── Quant lens ────────────────────────────────────────────
+                "signal_score":    round(r.score * 100) if r.score is not None else None,
+                "signal_label":    ROUTING_LABELS.get(routing, routing),
+                "signal_color":    ROUTING_COLORS.get(routing, "muted"),
+                "signal_routing":  routing,
+
+                # ── Veridia lens ──────────────────────────────────────────
+                "max_loss_5d_pct": var_pct,
+                "elevated_risk":   bool(r.wide_band) if r.wide_band is not None else None,
+                "risk_label":      "High Risk" if r.wide_band else "Normal Risk",
+
+                # ── Sentinel lens ─────────────────────────────────────────
+                "flag_count":      int(r.flag_count) if r.flag_count else 0,
+                "flag_types":      flag_types,
+                "flag_label":      (
+                    "None" if not flag_types
+                    else f"{len(flag_types)} flag" + ("s" if len(flag_types) > 1 else "")
+                ),
+            })
+
+        return {
+            "tickers":    tickers,
+            "count":      len(tickers),
+            "scan_fresh": len(tickers) > 0,
+        }
+    finally:
+        db.close()
+
+
 @app.get("/api/platform/data-inventory")
 def get_data_inventory():
     """Return row counts for all platform tables. Public — no auth required."""
