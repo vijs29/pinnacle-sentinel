@@ -1,5 +1,72 @@
 # Pinnacle Sentinel — Validation Methodology
 
+*Last updated: 2026-08-09 (v2.0)*
+
+> **Note to future Claude:** This file is organized newest-first within the
+> "Latest Methodology Updates" section. When adding new methodology, insert
+> a new dated subsection at the TOP of that section. Keep the older foundational
+> sections (Purpose, Flag Inventory, etc.) below. Version History is always last.
+
+---
+
+## Latest Methodology Updates (newest first)
+
+### 2026-08-09 — Six-State Signal Lifecycle + Earnings Extraction
+
+**Sentinel's new role — not just flags, but timing:**
+
+Sentinel has always detected red flags in SEC filings. The six-state signal
+lifecycle model (D-SIGNAL-LIFECYCLE-001) adds a new dimension: WHEN a flag
+appears relative to a Quant prediction matters as much as WHETHER it appears.
+
+A flag present at signal time (T=0) is already reflected in market prices —
+it's been there, analysts know about it. A flag appearing between T=0 and T+3,
+after a buy signal fired, is new negative information that the signal could not
+have anticipated. This timing distinction is critical for explaining why signals
+succeed or fail.
+
+**Flag timing across the six states:**
+
+| When flag appears | Predicted effect on signal outcome |
+|-------------------|-----------------------------------|
+| Before T=0 (pre-existing) | Moderate miss predictor — partially priced in |
+| Between T=0 and T+3 | Strong miss predictor — new negative information |
+| Between T=0 and T+5 | Very strong miss predictor at 5d horizon |
+| Between T=0 and T+21 | Significant miss predictor at 21d horizon |
+| Flag RESOLVES by T+21 | Potential recovery signal — governance improving |
+
+**Earnings extraction from 8-K corpus (D-SENTINEL-EARNINGS-001):**
+
+Sentinel ingests 365,000+ SEC filings including Item 2.02 8-K filings (earnings
+results). Currently, Quant only knows whether earnings occurred (`had_earnings=True`)
+— not whether the company beat or missed estimates.
+
+The planned enhancement: a Claude-powered background script reads Item 2.02
+filings, extracts actual EPS, estimated EPS, beat/miss, and surprise percentage,
+and writes to `platform_earnings_results` on the hub DB. This feeds State 3 (T+5)
+of the lifecycle model.
+
+Why this matters:
+- **Earnings miss + bullish signal = amplified loss** — the company disappointed
+  while we predicted it would outperform
+- **Earnings beat + bullish signal = amplified win** — the company confirmed our
+  signal's direction
+- A binary `had_earnings` flag cannot distinguish these two opposite outcomes
+
+**Sentinel flag severity validation:**
+
+The six-state model creates a feedback loop that validates Sentinel's own
+flag severity assumptions. Currently we treat all CFO resignations as equally
+serious. The lifecycle model will tell us:
+
+- CFO resignation → Quant 21d hit rate drops X points (empirical, from outcomes)
+- Material weakness → Quant 5d hit rate drops Y points
+- Auditor change → minimal 5d impact, significant 42d impact
+
+This converts qualitative severity judgments into empirically validated numbers.
+
+---
+
 ## Purpose
 
 This document describes how Pinnacle Sentinel detects, scores, and validates
@@ -207,8 +274,11 @@ Full architecture, pipeline diagram, and design rationale documented in:
 
 ## Version History
 
+> **Note to future Claude:** Add newest version at the top of this table.
+
 | Version | Date | Changes |
 |---------|------|---------|
+| 2.0 | Aug 2026 | Six-State Signal Lifecycle section added. Earnings extraction methodology. Flag severity validation framework. |
 | 3.0 | Aug 2026 | Session Audit Methodology section added (INF-017). |
 | 2.0 | Aug 2026 | Platform Documentation section added (INF-014 self-documenting platform). |
 | 1.0 | Aug 2026 | Initial methodology document. 12 flags documented, Six-Stage Gauntlet status, confluence scoring, known limitations. |
