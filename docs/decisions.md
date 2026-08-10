@@ -5,6 +5,86 @@
 > If a decision is reversed, add a new entry that supersedes the old one and
 > say so explicitly -- do not delete history. (Same append-only ethos as
 > Pinnacle Veridia's decisions.md.)
+## D-SENTINEL-EARNINGS-001 — Earnings beat/miss extraction from 8-K corpus (2026-08-09)
+
+**Context:** Sentinel ingests 8-K filings daily. Item 2.02 ("Results of Operations")
+contains earnings results — actual EPS, analyst estimates, and beat/miss status.
+This data is currently unused beyond filing ingestion. Meanwhile Quant's confidence
+scoring layer (D-CONFIDENCE-001) needs earnings beat/miss at prediction time to
+distinguish "had earnings + beat" from "had earnings + missed" — two opposite signals
+that a binary `had_earnings` flag cannot distinguish.
+
+**Decision:** Build a background Sentinel script that extracts structured earnings
+results from the existing 8-K corpus and writes them to a shared platform table.
+The data lives on the platform hub DB — not in Sentinel's own schema — because it
+is cross-product intelligence consumed by Quant, Veridia, and future products.
+
+**Why hub DB (not Sentinel DB):**
+- Earnings beat/miss is platform-level data, not Sentinel-specific
+- Quant needs it for confidence scoring (D-CONFIDENCE-001)
+- Veridia can use it for VaR adjustment (earnings events spike volatility)
+- Same pattern as `platform_methodology`, `platform_quality_checks`
+- All products already have DB connections to `pinnacle_platform`
+
+**New DB table: `platform_earnings_results`**
+```sql
+CREATE TABLE platform_earnings_results (
+    id              SERIAL PRIMARY KEY,
+    ticker          VARCHAR NOT NULL,
+    report_date     DATE NOT NULL,
+    fiscal_quarter  VARCHAR,          -- e.g. 'Q2 2026'
+    actual_eps      DOUBLE PRECISION,
+    estimated_eps   DOUBLE PRECISION,
+    beat_miss       VARCHAR,          -- 'beat' | 'miss' | 'inline' | 'unknown'
+    surprise_pct    DOUBLE PRECISION, -- (actual - estimate) / abs(estimate) * 100
+    filing_id       INTEGER REFERENCES pinnacle_sentinel_filings(id),
+    source          VARCHAR NOT NULL DEFAULT 'sentinel_8k', -- or 'alpha_vantage'
+    extracted_at    TIMESTAMP DEFAULT NOW(),
+    UNIQUE (ticker, report_date, source)
+);
+```
+
+**Extraction pipeline:**
+- Script: `pinnacle-infra/tools/extract_earnings_results.py`
+- Runs inside `pinnacle-ops` container
+- Reads from `pinnacle_sentinel_filings` where `form_type = '8-K'`
+- Filters for Item 2.02 content (earnings results)
+- Uses Claude (Anthropic API) to extract structured data from unstructured 8-K text:
+  actual EPS, estimated EPS, fiscal quarter
+- Computes beat/miss and surprise_pct
+- Upserts to `platform_earnings_results`
+- EC2 cron: nightly after Sentinel's filing ingestion
+
+**Seed data:**
+Alpha Vantage earnings cache (`data/earnings_cache/`) seeds the table initially
+with `source = 'alpha_vantage'`. Sentinel extractor then fills gaps and adds
+new quarters as they're filed, with `source = 'sentinel_8k'` taking precedence
+where both exist.
+
+**Platform hub endpoint:**
+- `GET /api/earnings/{ticker}` — returns earnings history for a ticker
+- `GET /api/earnings/recent` — returns all earnings events in last 90 days
+
+**Consumers:**
+- Quant confidence scoring (D-CONFIDENCE-001) — at prediction time
+- Hit/Miss Analysis page — enrich `had_earnings` with beat/miss context
+- Veridia — future: adjust VaR forecasts around earnings windows
+- Sentinel — future: correlate earnings surprises with subsequent red flag filings
+
+**Build sequence:**
+1. Create `platform_earnings_results` DB table (Ansible Step 12b)
+2. Seed from Alpha Vantage cache (one-time script)
+3. Build `extract_earnings_results.py` with Claude API extraction
+4. Wire EC2 cron (nightly after Sentinel ingestion)
+5. Add hub endpoints `/api/earnings/{ticker}` and `/api/earnings/recent`
+6. Wire into Quant confidence scoring (D-CONFIDENCE-001)
+
+**Status:** 🔄 Planned (2026-08-09). Runs as background process while other
+priority work continues. Does not block D-CONFIDENCE-001 — Alpha Vantage
+data seeds the table immediately.
+
+---
+
 ## D-JOUR-001 — Journal order standardized to newest-first (2026-08-05)
 
 **Context:** Sentinel's `docs/journal.md` was written oldest-first (July 20 →
