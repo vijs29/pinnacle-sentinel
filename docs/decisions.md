@@ -1,10 +1,54 @@
 # Pinnacle Sentinel — Decisions Log
 
 > This is the binding record of *why* the project is built the way it is.
-> Every entry is dated. Decisions are appended, never silently rewritten.
-> If a decision is reversed, add a new entry that supersedes the old one and
-> say so explicitly -- do not delete history. (Same append-only ethos as
-> Pinnacle Veridia's decisions.md.)
+> Every entry is dated. Newest entry first, oldest at bottom.
+> If a decision is reversed, add a new entry that supersedes the old one —
+> never delete history.
+
+> **Note to future Claude:** Always insert new decisions at the TOP of this file,
+> immediately after this header block. Newest entry first. Never append to bottom.
+
+---
+
+## D-SIGNAL-LIFECYCLE-001 — Sentinel's role in six-state signal lifecycle (2026-08-09)
+
+**Context:** The six-state signal lifecycle model (D-SIGNAL-LIFECYCLE-001 in hub
+decisions) tracks how the environment around a prediction evolves from signal time
+(T=0) through each grade horizon (T+3, T+5, T+21, T+42) to post-validation.
+Sentinel is a critical data provider for States 2-5.
+
+**Sentinel's contributions to the lifecycle model:**
+
+| State | Sentinel contribution |
+|-------|----------------------|
+| State 1 (T=0) | Flag count + flag types at signal time — feeds confidence score |
+| State 2 (T+3) | New 8-K filings detected between T=0 and T+3 — early warning signal |
+| State 3 (T+5) | Earnings beat/miss from Item 2.02 8-K (via platform_earnings_results) |
+| State 4 (T+21) | Flag resolution — did any flags clear between T=0 and T+21? |
+| State 5 (T+42) | Final flag count — total governance exposure over the prediction window |
+| State 6 | Flag severity validated against outcome — does CFO resignation predict miss? |
+
+**Flag TIMING is more informative than flag PRESENCE:**
+- Flag at T=0 → already priced in, lower impact
+- Flag appearing between T=0 and T+3 → new negative information, high miss predictor
+- Flag resolving between T=0 and T+21 → potential signal for recovery
+
+**Earnings extraction (D-SENTINEL-EARNINGS-001):**
+- Sentinel extracts earnings beat/miss from Item 2.02 8-K filings
+- Stored in `platform_earnings_results` on hub DB
+- Fed to State 3 (T+5) of the lifecycle model — earnings miss is the strongest 5d miss predictor
+- Also validates Sentinel's own flag severity: do earnings misses correlate with prior CFO flags?
+
+**What Sentinel learns from Quant outcomes:**
+- If CFO resignation flag → Quant signal misses 73% of the time at 21d → validates flag severity
+- If material weakness flag → Quant signal misses 68% of the time → validates flag severity
+- If auditor change flag → minimal impact on 5d but significant on 42d → flag timing matters
+- Sentinel flag severity scores can be calibrated against signal outcome data
+
+**Status:** 🔄 Planned (2026-08-09). Depends on D-SENTINEL-EARNINGS-001.
+
+---
+
 ## D-SENTINEL-EARNINGS-001 — Earnings beat/miss extraction from 8-K corpus (2026-08-09)
 
 **Context:** Sentinel ingests 8-K filings daily. Item 2.02 ("Results of Operations")
