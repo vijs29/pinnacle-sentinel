@@ -5,6 +5,38 @@
 
 ---
 
+## 2026-08-09 — D-SENTINEL-EARNINGS-001 decision written; /api/universe added
+
+### /api/universe cross-product endpoint added (INF-018)
+- Cross-product SELECT grants: `pinnacle_sentinel_app` can now read
+  `pinnacle_quant_scan_results` and `pinnacle_veridia_var_forecast`
+- Returns 126 tickers × 3 lenses — identical to platform hub and Quant
+- Verified: `curl https://sentinel.pinnacletranscore.com/api/universe` → 126 tickers ✓
+
+### D-SENTINEL-EARNINGS-001 decision written
+- Sentinel to extract earnings beat/miss from existing 8-K corpus (Item 2.02 filings)
+- 365,387 filings already ingested — earnings results are in the data, not yet extracted
+- Architecture:
+  - Script: `pinnacle-infra/tools/extract_earnings_results.py`
+  - Runs in `pinnacle-ops` container
+  - Uses Claude (Anthropic API) to parse unstructured 8-K text
+  - Writes to `platform_earnings_results` table on platform hub DB
+  - Nightly cron after Sentinel ingestion
+- Seeds from Alpha Vantage cache initially
+- Consumers: Quant confidence scoring, Veridia VaR adjustment
+
+### D-CONFIDENCE-001 context
+- Sentinel flags (flag_count) are a factor in Quant's confidence scoring layer
+- AMD (2 flags), CSX (2 flags), XOM (2 flags), HOOD (1 flag) — all INCORRECT
+  in recent 5d predictions — consistent with flags as a miss predictor
+- Sentinel's governance data will feed directly into Quant's signal quality
+
+### Planned: D-BREADTH-003 — Governance Breadth page
+- `/governance-breadth` — % of 126 tickers with active flags in 30/90/180/365 days
+- Flag type trend analysis — which flag types are rising?
+- Not yet built — planned after Quant breadth pages verified
+
+---
 ## 2026-08-09 — D-HUB-001: Universe endpoint added; service renamed
 
 ### /api/universe cross-product endpoint added
