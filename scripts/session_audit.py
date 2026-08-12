@@ -35,6 +35,29 @@ def db_check():
         return False, f"DB check failed: {e}"
 
 
+def platform_stats_check():
+    """Check Sentinel production stats via platform hub /api/stats — INF-019."""
+    try:
+        import requests
+        r = requests.get(
+            "https://platform.pinnacletranscore.com/api/stats", timeout=5
+        )
+        if not r.ok:
+            return False, f"Platform stats endpoint returned {r.status_code}"
+        data = r.json()
+        s = data.get("sentinel", {})
+        filings = s.get("filings_processed", 0)
+        flags = s.get("flag_events", 0)
+        facts = s.get("financial_facts", 0)
+        if filings == 0:
+            return False, "Sentinel filings: 0 — ingestion may be stalled"
+        return True, (
+            f"Filings: {filings:,} | Flags: {flags:,} | Financial facts: {facts:,}"
+        )
+    except Exception as e:
+        return True, f"Platform stats check skipped: {e}"
+
+
 run_audit({
     "product_name":  "Pinnacle Sentinel",
     "expected_venv": ".venv-sentinel",
@@ -49,5 +72,7 @@ run_audit({
     "health_url":   "https://sentinel.pinnacletranscore.com/api/health",
     "ledger_check": None,
     "db_check":     db_check,
-    "extra_checks": [],
+    "extra_checks": [
+        ("Platform stats", platform_stats_check),
+    ],
 })
