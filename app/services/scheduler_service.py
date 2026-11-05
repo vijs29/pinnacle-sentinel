@@ -45,6 +45,22 @@ def _run_safely(name, fn, *args, **kwargs):
         logger.info(f"scheduler: {name} complete")
     except Exception as e:
         logger.error(f"scheduler: {name} failed: {e}")
+        _alert(f"Sentinel job failed: {name}", str(e))
+
+
+def _alert(title: str, message: str) -> None:
+    """Push notification; never raises, so a failed alert cannot break the scheduler."""
+    try:
+        from app.services.alerts import send_push
+        send_push(title, message)
+    except Exception as e:
+        logger.warning(f"scheduler: alert not sent: {e}")
+
+
+def _on_job_event(event) -> None:
+    """A job that never started (container was down past its grace time) would otherwise be silent."""
+    _alert(f"Sentinel job MISSED: {event.job_id}", "The scheduled run did not start (the container was likely down). "
+           "Day Close will show whether the data is stale.")
 
 
 def _edgar_ingest_job():
@@ -156,6 +172,9 @@ def start_scheduler() -> None:
         CronTrigger(day_of_week="sun", hour=4, minute=0, timezone=_ET),
         id="quant_flags", max_instances=1, coalesce=True, misfire_grace_time=3600,
     )
+
+    from apscheduler.events import EVENT_JOB_MISSED
+    _scheduler.add_listener(_on_job_event, EVENT_JOB_MISSED)
 
     _scheduler.start()
     for job in _scheduler.get_jobs():
