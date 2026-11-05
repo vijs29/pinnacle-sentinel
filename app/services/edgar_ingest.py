@@ -35,6 +35,9 @@ UNIVERSE_PATH = Path(__file__).resolve().parents[2] / "app" / "config" / "univer
 # SEC allows up to 10 req/sec; stay comfortably under that
 REQUEST_DELAY_SECONDS = 0.15
 
+# More than this share of failed company lookups makes a run a failure, not a success.
+MAX_FAILED_FRACTION = 0.20
+
 
 def load_universe() -> list[dict]:
     with open(UNIVERSE_PATH) as f:
@@ -123,6 +126,14 @@ def ingest():
     print(f"New filings inserted: {total_new}")
     if failed_ciks:
         print(f"Sample failed CIKs: {failed_ciks[:10]}")
+
+    # A run where many lookups failed (SEC outage, blocked User-Agent, network) must not
+    # look like a success: it would leave the data silently stale.
+    if universe and len(failed_ciks) / len(universe) > MAX_FAILED_FRACTION:
+        raise RuntimeError(
+            f"edgar_ingest: {len(failed_ciks)}/{len(universe)} company lookups failed "
+            f"(> {MAX_FAILED_FRACTION:.0%}) -- data NOT up to date"
+        )
 
 
 if __name__ == "__main__":

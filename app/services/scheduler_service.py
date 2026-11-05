@@ -19,7 +19,9 @@ need intraday precision):
   edgar_ingest         06:00 Mon-Fri -- pulls new 10-K/10-Q/8-K/4/DEF14A
                        metadata before the trading day starts
   flag_detector_8k     07:00 Mon-Fri -- rescans new 8-Ks for disclosure flags
+  form4_ingest         06:30 Mon-Fri -- parses new Form 4 insider transactions
   going_concern        07:30 Mon-Fri -- scans new 10-Ks
+  insider_cluster      07:45 Mon-Fri -- insider selling-cluster flags (needs form4_ingest)
   investigation_search 08:00 Mon-Fri -- SEC full-text search sweep
   xbrl_ingest          Sunday 02:00 -- weekly, XBRL facts don't change intraday
   quant_scores         Sunday 03:00 -- weekly, depends on fresh XBRL facts
@@ -58,6 +60,16 @@ def _flag_detector_8k_job():
 def _going_concern_job():
     from app.services.going_concern_detector import run
     _run_safely("going_concern", run, limit=5000, rescan_all=False)
+
+
+def _form4_ingest_job():
+    from app.services.form4_ingest import run
+    _run_safely("form4_ingest", run, limit=20000, rescan_all=False)
+
+
+def _insider_cluster_job():
+    from app.services.insider_selling_cluster_detector import run
+    _run_safely("insider_cluster", run, rescan_all=False)
 
 
 def _investigation_search_job():
@@ -105,6 +117,11 @@ def start_scheduler() -> None:
         id="edgar_ingest", max_instances=1, coalesce=True, misfire_grace_time=1800,
     )
     _scheduler.add_job(
+        _form4_ingest_job,
+        CronTrigger(day_of_week="mon-fri", hour=6, minute=30, timezone=_ET),
+        id="form4_ingest", max_instances=1, coalesce=True, misfire_grace_time=1800,
+    )
+    _scheduler.add_job(
         _flag_detector_8k_job,
         CronTrigger(day_of_week="mon-fri", hour=7, minute=0, timezone=_ET),
         id="flag_detector_8k", max_instances=1, coalesce=True, misfire_grace_time=1800,
@@ -113,6 +130,11 @@ def start_scheduler() -> None:
         _going_concern_job,
         CronTrigger(day_of_week="mon-fri", hour=7, minute=30, timezone=_ET),
         id="going_concern", max_instances=1, coalesce=True, misfire_grace_time=1800,
+    )
+    _scheduler.add_job(
+        _insider_cluster_job,
+        CronTrigger(day_of_week="mon-fri", hour=7, minute=45, timezone=_ET),
+        id="insider_cluster", max_instances=1, coalesce=True, misfire_grace_time=1800,
     )
     _scheduler.add_job(
         _investigation_search_job,
