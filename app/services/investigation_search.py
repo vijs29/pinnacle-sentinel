@@ -27,6 +27,7 @@ from app.models.quant_score import QuantScore  # noqa: F401 -- import needed so
 SEC_HEADERS = {"User-Agent": "Vijay Sentinel vijay.cloudarchitect@gmail.com"}
 EFTS_URL = "https://efts.sec.gov/LATEST/search-index"
 REQUEST_DELAY_SECONDS = 0.3
+RETRY_BACKOFF_SECONDS = [2, 5, 10]   # waits before each retry of a refused/failed search
 
 UNIVERSE_PATH = Path(__file__).resolve().parents[2] / "app" / "config" / "universe.csv"
 
@@ -70,6 +71,19 @@ def search_efts(query: str, forms: str, start_date: str, end_date: str, from_: i
     return resp.json()
 
 
+def _search_with_retry(phrase: str, start_date: str, end_date: str):
+    """One phrase search, retried a few times. SEC sometimes refuses a request (rate limit / blip);
+    a single refusal must not silently drop that phrase's results for the whole window."""
+    for wait in [0] + RETRY_BACKOFF_SECONDS:
+        if wait:
+            time.sleep(wait)
+        data = search_efts(phrase, TARGET_FORMS, start_date, end_date)
+        time.sleep(REQUEST_DELAY_SECONDS)
+        if data is not None:
+            return data
+    return None
+
+
 def ingest(start_date: str, end_date: str):
     """start_date/end_date: 'YYYY-MM-DD'. Run incrementally (e.g. monthly)
     rather than backfilling the full 2001-present history in one call --
@@ -88,17 +102,23 @@ def ingest(start_date: str, end_date: str):
     total_hits_seen = 0
     total_in_universe = 0
     flags_created = 0
+    failures = []
 
     for phrase, flag_type in INVESTIGATION_QUERIES:
-        data = search_efts(phrase, TARGET_FORMS, start_date, end_date)
-        time.sleep(REQUEST_DELAY_SECONDS)
+        data = _search_with_retry(phrase, start_date, end_date)
 
         if data is None:
-            print(f"  WARN: search failed for phrase '{phrase}'")
+            print(f"  WARN: search failed for phrase '{phrase}' after retries")
+            failures.append(f"'{phrase}': search failed after retries")
             continue
 
         hits = data.get("hits", {}).get("hits", [])
         total_hits_seen += len(hits)
+        # SEC may have more matches than one response returns; the extra ones would be lost silently.
+        reported_total = data.get("hits", {}).get("total", {}).get("value", len(hits))
+        if reported_total > len(hits):
+            print(f"  WARN: '{phrase}' returned {len(hits)} of {reported_total} matches")
+            failures.append(f"'{phrase}': only {len(hits)} of {reported_total} matches returned (use a shorter window)")
 
         for hit in hits:
             source = hit.get("_source", {})
@@ -152,6 +172,12 @@ def ingest(start_date: str, end_date: str):
     print(f"Total hits seen (all companies, not just universe): {total_hits_seen}")
     print(f"Hits within our 503-company universe: {total_in_universe}")
     print(f"New flags created: {flags_created}")
+
+    # Whatever was found is saved above, but an incomplete run must not look like a success.
+    if failures:
+        raise RuntimeError(
+            f"investigation_search {start_date}..{end_date}: results NOT complete -- " + "; ".join(failures)
+        )
 
 
 if __name__ == "__main__":
