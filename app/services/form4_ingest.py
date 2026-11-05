@@ -186,7 +186,9 @@ def run(limit=None, rescan_all=False):
         already_ingested_subq = db.query(InsiderTransaction.filing_id).distinct().subquery()
         query = query.filter(~Filing.id.in_(db.query(already_ingested_subq.c.filing_id)))
 
-    query = query.order_by(Filing.id)
+    # Newest first: the insider-selling signal only needs the last 30 days, so a
+    # large historical backlog must never delay the recent filings.
+    query = query.order_by(Filing.filing_date.desc(), Filing.id.desc())
     if limit:
         query = query.limit(limit)
     filings = query.all()

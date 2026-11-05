@@ -36,7 +36,9 @@ def _startup():
     # first (which any script run through the API process does).
     from app.db.base import Base
     from app.db.session import admin_engine
-    from app.models import filing, user, financial_fact, quant_score  # noqa: F401
+    from app.models import (  # noqa: F401
+        filing, user, financial_fact, quant_score, insider_transaction,
+    )
     Base.metadata.create_all(admin_engine, checkfirst=True)
 
     from app.services.scheduler_service import start_scheduler
