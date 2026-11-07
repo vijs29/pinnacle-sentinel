@@ -12,3 +12,4 @@ sentinel_dump.sql
 *.pgdump
 .envrc
 .venv-sentinel/
+tools/audit/site_crawl_report.md

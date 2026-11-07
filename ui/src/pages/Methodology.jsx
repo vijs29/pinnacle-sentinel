@@ -1,5 +1,6 @@
 import NavBar from '../components/NavBar'
 import RaqaFooter from '../components/RaqaFooter'
+import { SCORE_BANDS } from '../lib/flagInfo'
 
 const FLAGS = [
   { name: 'Late filing', detail: 'NT 10-K / NT 10-Q -- the filing itself is the flag.' },
@@ -20,13 +21,6 @@ const QUANT_FLAGS = [
   { name: 'Sloan accruals ratio', detail: 'Flags earnings running well ahead of cash flow.' },
 ]
 
-const SCORE_BANDS = [
-  { range: '1-2',   label: 'Clean',    color: 'var(--green)',  action: 'BUY recorded normally' },
-  { range: '3-4',   label: 'Elevated', color: 'var(--amber)',  action: 'BUY \u2192 WATCH' },
-  { range: '5-6',   label: 'High',     color: 'var(--red)',    action: 'BUY \u2192 AVOID' },
-  { range: '7-9',   label: 'Severe',   color: 'var(--red)',    action: 'BUY \u2192 AVOID, full breakdown shown' },
-  { range: '10-12', label: 'Extreme', color: '#8b1a1a',        action: 'BUY \u2192 AVOID, prominent warning' },
-]
 
 export default function Methodology() {
   return (

@@ -11,6 +11,7 @@
 
 import { useState, useEffect } from 'react'
 import NavBar from '../components/NavBar'
+import { BASE_URL } from '../api/client'
 
 const TABS = [
   { key: 'quant',    label: 'Pinnacle Quant',           color: '#c9a84c' },
@@ -109,7 +110,7 @@ export default function PlatformMethodology() {
   const [activeTab, setActiveTab] = useState('quant')
 
   useEffect(() => {
-    fetch('/api/platform/methodology')
+    fetch(`${BASE_URL}/api/platform/methodology`)
       .then(r => r.ok ? r.json() : Promise.reject(r.status))
       .then(d => { setData(d); setLoading(false) })
       .catch(e => { setError(`Failed to load (${e})`); setLoading(false) })

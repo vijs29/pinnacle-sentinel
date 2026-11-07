@@ -374,6 +374,18 @@ def get_quality_checks(authorization: str = Header(None)):
     finally:
         db.close()
 
+@app.get("/api/validation/status")
+def get_validation_status():
+    """Exact counts for the Flag Validation page: flags detected and flags graded against outcomes."""
+    from app.db.session import SessionLocal
+    from app.services.validation_status import validation_status
+    db = SessionLocal()
+    try:
+        return validation_status(db)
+    finally:
+        db.close()
+
+
 @app.get("/api/stats")
 def get_stats():
     """Public stats for Landing page stats strip. No auth required."""

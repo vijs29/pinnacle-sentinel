@@ -64,7 +64,6 @@ const NAV_LINKS = [
 
 const ACCOUNT_LINKS = [
   { path: '/watchlist', label: 'My Watchlist' },
-  { path: '/alerts',    label: 'My Alerts' },
 ]
 
 export default function NavBar({ subtitle, hideBackHome = false }) {

@@ -124,12 +124,13 @@ export default function Landing() {
           SEC FILINGS SURVEILLANCE
         </div>
         <h1 style={{ fontSize: 42, fontWeight: 800, lineHeight: 1.15, margin: '0 0 20px', letterSpacing: -0.5 }}>
-          Every filing gets read.<br />Most of them are hiding something.
+          Every SEC filing, read for you.<br />The intelligence inside each one, surfaced.
         </h1>
         <p style={{ fontSize: 17, color: 'var(--text-secondary)', lineHeight: 1.6, maxWidth: 560, margin: '0 auto 32px' }}>
-          Sentinel watches the S&P 500's SEC filings for the disclosure patterns and
-          financial-statement red flags that short sellers look for by hand —
-          before the market catches up.
+          Sentinel extracts the intelligence available in SEC filings about each company
+          that files — disclosure events and financial-statement signals — and turns them
+          into flags, currently across the S&P 500. A flag is a prompt to look closer,
+          not a conclusion about intent.
         </p>
         <button onClick={() => navigate('/screener')} style={{
           background: 'var(--red)', color: '#fff', border: 'none', borderRadius: 8,

@@ -235,6 +235,18 @@ Complete architecture, check table, and adding-new-product instructions:
 
 ---
 
+## Site Crawl (Visitor-View Audit)
+
+> **Status: in use.** The crawler is `tools/audit/site_crawl.py` (tests: `tests/test_site_crawl.py`). Run it against the local dev server before any UI deploy and against the live site after one. The standard is 0 errors.
+
+The platform's other audits look at the system from the inside (containers, databases, git, row counts). The site crawler looks at it the way a visitor does: it opens every page of the product's website and reports a page that fails to load, a dead or duplicated menu entry, a link that no longer works, a stale date, repeated text or a page that scrolls sideways on a phone. It follows the platform standard, which is 0 errors before any UI deploy.
+
+Full description, what it checks and what it does not: pinnacle-infra METHODOLOGY.md, "Site Crawl Methodology". The same crawler is in use for Veridia, the Hub and Sentinel.
+
+Sentinel settings: pages whose dates are historical content, not freshness signals, are listed in `STATIC_DATE_ROUTES` (`/`, `/infrastructure`, `/beneish`, `/altman`, `/flags/*`, `/platform-methodology`); pages that legitimately repeat shared text are in `DUP_OK_ROUTES` (`/`, `/flags/*`). `/platform-intelligence` needs a login, so the crawler expects a redirect to `/login`. Links to sec.gov are checked with a descriptive User-Agent that includes a contact email and a 0.2-second delay between requests, as SEC's fair-access policy requires; without that SEC answers 403.
+
+---
+
 ## Platform Documentation (INF-014)
 
 ### The self-documenting platform
@@ -278,6 +290,8 @@ Full architecture, pipeline diagram, and design rationale documented in:
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 3.1 | Nov 2026 | Site Crawl section (planned status). |
+| 3.2 | Nov 2026 | Site Crawl in use for Sentinel; Sentinel crawl settings; SEC User-Agent note. |
 | 2.0 | Aug 2026 | Six-State Signal Lifecycle section added. Earnings extraction methodology. Flag severity validation framework. |
 | 3.0 | Aug 2026 | Session Audit Methodology section added (INF-017). |
 | 2.0 | Aug 2026 | Platform Documentation section added (INF-014 self-documenting platform). |

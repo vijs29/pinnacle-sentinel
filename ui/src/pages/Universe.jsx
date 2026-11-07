@@ -15,8 +15,10 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import NavBar from '../components/NavBar'
+import { BASE_URL } from '../api/client'
 
-const QUANT_BASE = 'https://platform.pinnacletranscore.com'
+// Live site reads the platform hub; the local dev server reads Sentinel's own backend (the hub's CORS blocks localhost).
+const QUANT_BASE = import.meta.env.DEV ? BASE_URL : 'https://platform.pinnacletranscore.com'
 
 const SIGNAL_COLORS = {
   green: '#1d9e75',
