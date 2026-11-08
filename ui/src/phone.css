@@ -1,0 +1,10 @@
+/* Phone layout (found by the site crawler's layout checks). Applies only below 600px; desktop is unchanged.
+   Loaded after index.css so it wins ties. */
+@media (max-width: 600px) {
+  /* Anything tapped is at least 34px each way (the crawler's floor is 32px). */
+  button, select, a[href], [role="button"],
+  input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]) {
+    min-height: 34px;
+    min-width: 34px;
+  }
+}

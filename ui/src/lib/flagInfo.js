@@ -51,5 +51,5 @@ export const SCORE_BANDS = [
   { range: '3-4',   label: 'Elevated', color: 'var(--amber)',  action: 'BUY → WATCH' },
   { range: '5-6',   label: 'High',     color: 'var(--red)',    action: 'BUY → AVOID' },
   { range: '7-9',   label: 'Severe',   color: 'var(--red)',    action: 'BUY → AVOID, full breakdown shown' },
-  { range: '10-12', label: 'Extreme',  color: '#8b1a1a',       action: 'BUY → AVOID, prominent warning' },
+  { range: '10-12', label: 'Extreme',  color: '#ff5c5c',       action: 'BUY → AVOID, prominent warning' },
 ]

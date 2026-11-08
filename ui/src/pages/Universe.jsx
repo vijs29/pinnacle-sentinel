@@ -25,7 +25,7 @@ const SIGNAL_COLORS = {
   gold:  '#c9a84c',
   amber: '#f59e0b',
   red:   '#d4443f',
-  muted: '#475569',
+  muted: '#94a3b8',
 }
 
 const FLAG_LABELS = {

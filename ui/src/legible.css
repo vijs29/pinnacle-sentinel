@@ -1,0 +1,11 @@
+/* Text is never smaller than 11px (the crawler's floor). Micro-labels are styled inline at 9px and 10px, so these
+   rules match on the style attribute. Applies at every width. */
+[style*="font-size: 9px"],
+[style*="font-size: 10px"] {
+  font-size: 11px !important;
+}
+
+/* Table headers that set no size of their own. */
+th:not([style*="font-size"]) {
+  font-size: 11px;
+}

@@ -403,18 +403,8 @@ def get_stats():
 
     db = SessionLocal()
     try:
-        rows = db.execute(text("""
-            SELECT relname as table_name, COALESCE(n_live_tup, 0) as row_count
-            FROM pg_stat_user_tables
-            WHERE schemaname = 'public'
-            AND relname IN (
-                'pinnacle_sentinel_filings',
-                'pinnacle_sentinel_financial_facts',
-                'pinnacle_sentinel_flag_events',
-                'pinnacle_sentinel_quant_scores'
-            )
-        """)).fetchall()
-        counts = {r.table_name: int(r.row_count) for r in rows}
+        from app.services_counts import exact_counts
+        counts = exact_counts(db)
         return {
             "filings_processed": counts.get("pinnacle_sentinel_filings", 0),
             "financial_facts":   counts.get("pinnacle_sentinel_financial_facts", 0),
