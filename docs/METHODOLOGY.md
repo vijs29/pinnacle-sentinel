@@ -282,6 +282,9 @@ Full architecture, pipeline diagram, and design rationale documented in:
 | Endpoint | `GET /api/platform/founder-manual` (auth required) |
 | Assembly schedule | Nightly 9pm ET via pinnacle-ops cron (INF-014) |
 
+**Layout checks (2026-11-07).** The crawler's layout checks (INF-034) found on live Sentinel: small tap targets on a phone, 10 px labels, and two dim colours (universe NONE badge, the Extreme flag colour). Fixed in `ui/src/phone.css`, `ui/src/legible.css`, `Universe.jsx` and `lib/flagInfo.js`; UI tests pin each. The live crawl after deploy closes this.
+
+
 ---
 
 ## Version History
