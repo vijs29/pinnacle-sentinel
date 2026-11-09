@@ -168,6 +168,13 @@ def flag(level, where, msg):
 EXTERNAL_CHECK = os.getenv("EXTERNAL_CHECK", "1") != "0"   # set 0 when offline
 
 
+def duplicate_menu_targets(seen, allow_dup, gated):
+    """Menu entries that share a destination. Login-only entries all land on /login for a visitor, so when the site has
+    gated routes that shared destination is expected, not a defect."""
+    return [(path, labs) for path, labs in seen.items()
+            if len(labs) > 1 and path not in allow_dup and not (path == "/login" and gated)]
+
+
 def route_in(route, entries):
     """True if the route is listed in entries; an entry ending in * matches any route with that prefix."""
     return any(route == e or (e.endswith("*") and route.startswith(e[:-1])) for e in entries)
@@ -377,9 +384,8 @@ def main():
             elif base_path not in routes and base_path not in SKIP and not any(p.fullmatch(base_path) for p in patterns):
                 flag("ERROR", f"menu '{label}'", f"goes to {path}, which is not a known page")
             seen.setdefault(path, []).append(label)
-        for path, labs in seen.items():
-            if len(labs) > 1 and path not in ALLOW_DUP:
-                flag("WARN", f"menu → {path}", f"{len(labs)} entries go to the same page: {labs}")
+        for path, labs in duplicate_menu_targets(seen, ALLOW_DUP, GATED):
+            flag("WARN", f"menu → {path}", f"{len(labs)} entries go to the same page: {labs}")
         if labels:
             flag("INFO", "menu", f"{len(labels)} entries checked")
         mctx.close()

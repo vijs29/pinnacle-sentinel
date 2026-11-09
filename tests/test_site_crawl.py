@@ -257,3 +257,23 @@ def test_browser_overlap_on_a_later_line_of_wrapped_text_is_found(_browser):
     got = _on_phone(_browser, '<body style="margin:0"><p style="width:100px;margin:0"><span>aaaa bbbb cccc dddd eeee ffff</span></p>'
                               '<div style="margin-top:-18px;width:60px;height:18px">covering block</div></body>')
     assert len(got["overlap"]) == 1 and "covering block" in got["overlap"][0]
+
+
+# ── login-only menu entries all land on /login for a visitor: expected, not a duplicate ──
+def test_gated_menu_entries_sharing_the_login_page_are_not_flagged():
+    seen = {"/login": ["My Signals", "My Trades"]}
+    assert sc.duplicate_menu_targets(seen, set(), {"/my-signals", "/my-trades"}) == []
+
+
+def test_login_duplicates_are_flagged_when_the_site_has_no_gated_routes():
+    seen = {"/login": ["A", "B"]}
+    assert sc.duplicate_menu_targets(seen, set(), set()) == [("/login", ["A", "B"])]
+
+
+def test_other_duplicate_menu_targets_are_still_flagged_and_allowed_ones_are_not():
+    seen = {"/scan": ["Scan", "Scanner"], "/universe": ["A", "B"], "/x": ["Only"]}
+    assert sc.duplicate_menu_targets(seen, {"/universe"}, {"/g"}) == [("/scan", ["Scan", "Scanner"])]
+
+
+def test_menu_check_uses_the_duplicate_helper():
+    assert "duplicate_menu_targets(seen, ALLOW_DUP, GATED)" in _crawler_source()
